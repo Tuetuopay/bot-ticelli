@@ -45,7 +45,31 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn win(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, format!("Yo looks like {:?} are winners", msg.mentions)).await?;
+    match msg.mentions.as_slice() {
+        [] => {
+            let content = MessageBuilder::new()
+                .mention(&msg.author)
+                .push(", cékiki le gagnant ?")
+                .build();
+            msg.channel_id.say(&ctx.http, content).await?;
+        }
+        [winner] => {
+            let content = MessageBuilder::new()
+                .push("Bravo ")
+                .mention(winner)
+                .push(", plus un dans votre pot à moutarde. A vous la main.")
+                .build();
+            msg.channel_id.say(&ctx.http, content).await?;
+        }
+        [..] => {
+            msg.channel_id.say(&ctx.http, MessageBuilder::new()
+                .push("Hé ")
+                .mention(&msg.author)
+                .push(", tu serai pas un peu fada ? Un seul gagnant, un seul !")
+                .build()
+            ).await?;
+        }
+    }
 
     Ok(())
 }
