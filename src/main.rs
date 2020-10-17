@@ -1,13 +1,23 @@
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate diesel;
 
+use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
 use serenity::prelude::*;
 use serenity::framework::StandardFramework;
 
 mod bot;
 mod config;
+mod schema;
+mod models;
 
 use bot::Bot;
+
+struct PgPool;
+impl TypeMapKey for PgPool {
+    type Value = Pool<ConnectionManager<PgConnection>>;
+}
 
 #[tokio::main]
 async fn main() {
@@ -22,6 +32,11 @@ async fn main() {
         .map_err(|e| format!("Failed to load {}: {}", config, e))
         .unwrap();
 
+    // Connect to database
+    println!("Connecting to postgres...");
+    let manager = ConnectionManager::<PgConnection>::new(&config.db_config.database_url);
+    let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
+
     // Create client instance
     println!("Connecting to discord...");
     let framework = StandardFramework::new()
@@ -34,6 +49,7 @@ async fn main() {
         .framework(framework)
         .await
         .expect("Failed to create discord client");
+    client.data.write().await.insert::<PgPool>(pool);
 
     println!("Runing app...");
     client.start().await.expect("Client error")

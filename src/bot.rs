@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 
+use diesel::prelude::RunQueryDsl;
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
@@ -17,6 +18,9 @@ use serenity::{
     model::prelude::{Message, UserId},
     utils::MessageBuilder,
 };
+
+use crate::PgPool;
+use crate::models::*;
 
 pub struct Bot;
 
@@ -60,6 +64,17 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
                 .push(", plus un dans votre pot à moutarde. A vous la main.")
                 .build();
             msg.channel_id.say(&ctx.http, content).await?;
+
+            let conn = ctx.data.write().await
+                .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+                .get().expect("Failed to connect to database");
+            let win = NewWin {
+                player_id: &msg.author.id.0.to_string(),
+                winner_id: &winner.id.0.to_string(),
+            };
+            let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)
+                .expect("Failed to save win to database");
+            println!("Saved win {:?}", win);
         }
         [..] => {
             msg.channel_id.say(&ctx.http, MessageBuilder::new()
