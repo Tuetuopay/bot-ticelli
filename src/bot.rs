@@ -37,14 +37,14 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[command]
+#[command("win")]
 #[description("Marquer un joueur comme gagnant")]
 #[usage("<joueur>")]
 #[example("@Tuetuopay#2939")]
 #[num_args(1)]
 #[help_available]
 #[only_in(guild)]
-async fn win(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     match msg.mentions.as_slice() {
         [] => {
             let content = MessageBuilder::new()
@@ -94,5 +94,5 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(win, cmd_skip)]
+#[commands(cmd_win, cmd_skip)]
 pub struct General;
