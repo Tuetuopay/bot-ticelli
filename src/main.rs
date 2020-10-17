@@ -7,7 +7,7 @@ use serenity::framework::StandardFramework;
 mod bot;
 mod config;
 
-use bot::{Bot, General};
+use bot::Bot;
 
 #[tokio::main]
 async fn main() {
