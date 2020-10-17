@@ -2,11 +2,12 @@
 extern crate clap;
 
 use serenity::prelude::*;
+use serenity::framework::StandardFramework;
 
 mod bot;
 mod config;
 
-use bot::Bot;
+use bot::{Bot, General};
 
 #[tokio::main]
 async fn main() {
@@ -23,9 +24,14 @@ async fn main() {
 
     // Create client instance
     println!("Connecting to discord...");
+    let framework = StandardFramework::new()
+        .configure(|c| c.prefix("!"))
+        .group(&bot::GENERAL_GROUP)
+        .help(&bot::CMD_HELP);
+
     let mut client = Client::new(&config.auth.token)
-        // .event_handler(Bot {})
-        .framework(Bot {})
+        .event_handler(Bot)
+        .framework(framework)
         .await
         .expect("Failed to create discord client");
 

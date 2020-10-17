@@ -2,25 +2,45 @@
  * Actual discord client
  */
 
+use std::collections::HashSet;
+
 use serenity::{
-    async_trait,
-    framework::Framework,
-    model::{channel::Message, gateway::Ready},
-    prelude::*
+    client::{Context, EventHandler},
+    framework::standard::{
+        Args,
+        CommandGroup,
+        CommandResult,
+        HelpOptions,
+        help_commands,
+        macros::{command, group, help},
+    },
+    model::prelude::{Message, UserId},
 };
 
-pub struct Bot {}
+pub struct Bot;
 
-#[async_trait]
-impl Framework for Bot {
-    async fn dispatch(&self, ctx: Context, msg: Message) {
-        match msg.content.split(' ').next() {
-            Some("!win") => println!("Marking winner..."),
-            Some(cmd) => println!("Unknown command {}", cmd),
-            None => println!("wut?"),
-        }
-    }
+impl EventHandler for Bot {}
+
+#[command]
+async fn win(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.channel_id.say(&ctx.http, format!("Yo looks like {:?} are winners", msg.mentions)).await?;
+
+    Ok(())
 }
 
-impl Bot {
+#[help]
+async fn cmd_help(
+    ctx: &Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>
+) -> CommandResult {
+    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
+    Ok(())
 }
+
+#[group]
+#[commands(win)]
+pub struct General;
