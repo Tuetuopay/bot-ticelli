@@ -75,6 +75,12 @@ async fn win(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[help]
+#[no_help_available_text("On a pas le cul sorti des ronces, y'a pas d'aide ...")]
+#[usage_sample_label("Exemple")]
+#[guild_only_text("Pas de DM p'tit coquin :smirk:")]
+#[command_not_found_text("V'là qu'il utilise une commande inexistante. Y'en a vraiment qui ont pas \
+    la lumière à tous les étages ...")]
+#[strikethrough_commands_tip_in_guild("~~`Les commandes barrées`~~ sont indispo parce qu'on avait pas envie.")]
 async fn cmd_help(
     ctx: &Context,
     msg: &Message,

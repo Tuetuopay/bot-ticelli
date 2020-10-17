@@ -25,7 +25,7 @@ async fn main() {
     // Create client instance
     println!("Connecting to discord...");
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!"))
+        .configure(|c| c.allow_dm(false).prefix("!"))
         .group(&bot::GENERAL_GROUP)
         .help(&bot::CMD_HELP);
 
