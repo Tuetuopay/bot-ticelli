@@ -1,9 +1,12 @@
 #[macro_use]
 extern crate clap;
 
-use serenity::{async_trait, model::{channel::Message, gateway::Ready}, prelude::*};
+use serenity::prelude::*;
 
+mod bot;
 mod config;
+
+use bot::Bot;
 
 #[tokio::main]
 async fn main() {
@@ -17,4 +20,15 @@ async fn main() {
     let config = config::load_config(&config)
         .map_err(|e| format!("Failed to load {}: {}", config, e))
         .unwrap();
+
+    // Create client instance
+    println!("Connecting to discord...");
+    let mut client = Client::new(&config.auth.token)
+        // .event_handler(Bot {})
+        .framework(Bot {})
+        .await
+        .expect("Failed to create discord client");
+
+    println!("Runing app...");
+    client.start().await.expect("Client error")
 }
