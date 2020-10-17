@@ -5,10 +5,14 @@ authors = ["Tuetuopay <tuetuopay@me.com>"]
 edition = "2018"
 
 [dependencies]
+chrono = "0.4"
 clap = "2.33"
+diesel = { version = "1.4", features = ["r2d2", "postgres", "uuidv07", "chrono"] }
+barrel = "0.6"
 tokio = { version = "0.2", features = ["rt-threaded"] }
 toml = "0.5"
 serde = "1.0"
 serde_derive = "1.0"
 serenity = "0.9.0-rc.2"
 serenity_utils = "0.5"
+uuid = "0.8"
