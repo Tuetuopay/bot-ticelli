@@ -272,17 +272,14 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
         return Ok(())
     };
 
+    let player = UserId(part.player_id.parse().unwrap()).to_user(&ctx.http).await
+        .expect("Failed to fetch user");
+
     msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
-            e.image(url);
-            let desc = MessageBuilder::new()
-                .push("Image de ")
-                .mention(&UserId(part.player_id.parse().unwrap()))
-                .build();
-            e.description(desc);
-            e
-        });
-        m
+            e.author(|a| a.name(player.tag()).icon_url(player.face()))
+                .image(url)
+        })
     }).await?;
 
     Ok(())
