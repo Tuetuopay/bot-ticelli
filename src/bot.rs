@@ -109,6 +109,19 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         return Ok(())
     };
 
+    if winner.bot {
+        msg.channel_id.say(&ctx.http, "Tg le bot !").await?;
+        return Ok(())
+    }
+    if winner.id == msg.author.id {
+        let contents = MessageBuilder::new()
+            .mention(&msg.author)
+            .push(" be like https://i.imgflip.com/12w3f0.jpg")
+            .build();
+        msg.channel_id.say(&ctx.http, contents).await?;
+        return Ok(())
+    }
+
     let win = NewWin {
         player_id: &msg.author.id.0.to_string(),
         winner_id: &winner.id.0.to_string(),
