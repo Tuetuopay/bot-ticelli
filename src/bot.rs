@@ -16,7 +16,7 @@ use serenity::{
         macros::{command, group, help},
     },
     model::prelude::{Message, UserId},
-    utils::MessageBuilder,
+    utils::{Colour, MessageBuilder},
 };
 
 use crate::PgPool;
@@ -68,7 +68,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
             ).await?;
             return Ok(())
         }
-    }
+    };
 
     let conn = ctx.data.write().await
         .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
@@ -88,6 +88,26 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         .build();
     msg.channel_id.say(&ctx.http, content).await?;
 
+    Ok(())
+}
+
+#[command("show")]
+#[description("Afficher le scoreboard")]
+#[num_args(0)]
+#[help_available]
+#[only_in(guild)]
+async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.channel_id.send_message(&ctx.http, |m| {
+        m.embed(|mut e| {
+            e.title("Scoreboard");
+            e.description("Huh?");
+            e.colour(Colour::GOLD);
+            e.field("1", "Foo", false);
+            e.field("2", "Bar", false);
+            e
+        });
+        m
+    }).await?;
     Ok(())
 }
 
@@ -111,5 +131,5 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip)]
+#[commands(cmd_win, cmd_skip, cmd_show)]
 pub struct General;
