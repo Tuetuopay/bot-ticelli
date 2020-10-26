@@ -230,6 +230,51 @@ async fn cmd_cancel_reset(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command("pic")]
+#[description("Affiche l'image à deviner")]
+#[num_args(0)]
+#[help_available]
+#[only_in(guild)]
+async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+    let part = Participation::get_current(&conn).expect("Failed to fetch data from db");
+
+    let (part, url) = if let Some(part) = part {
+        match part.picture_url.clone() {
+            Some(url) => (part, url),
+            None => {
+                let content = MessageBuilder::new()
+                    .push("C'est au tour de ")
+                    .mention(&UserId(part.player_id.parse().unwrap()))
+                    .push(", mais il a pas posté de photo.")
+                    .build();
+                msg.channel_id.say(&ctx.http, content).await?;
+                return Ok(())
+            }
+        }
+    } else {
+        msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
+        return Ok(())
+    };
+
+    msg.channel_id.send_message(&ctx.http, |m| {
+        m.embed(|e| {
+            e.image(url);
+            let desc = MessageBuilder::new()
+                .push("Image de ")
+                .mention(&UserId(part.player_id.parse().unwrap()))
+                .build();
+            e.description(desc);
+            e
+        });
+        m
+    }).await?;
+
+    Ok(())
+}
+
 #[help]
 #[no_help_available_text("On a pas le cul sorti des ronces, y'a pas d'aide ...")]
 #[usage_sample_label("Exemple")]
@@ -250,5 +295,5 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_cancel_reset)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_cancel_reset, cmd_pic)]
 pub struct General;
