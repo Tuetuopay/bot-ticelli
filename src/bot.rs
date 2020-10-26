@@ -96,6 +96,19 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await
         .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
         .get().expect("Failed to connect to database");
+
+    let part = Participation::get_current(&conn).expect("Failed to fetch data from database");
+    let part = if let Some(part) = part {
+        if part.player_id != msg.author.id.to_string() {
+            msg.channel_id.say(&ctx.http, "Tut tut tut, c'est pas toi qui a la main...").await?;
+            return Ok(())
+        }
+        part
+    } else {
+        msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
+        return Ok(())
+    };
+
     let win = NewWin {
         player_id: &msg.author.id.0.to_string(),
         winner_id: &winner.id.0.to_string(),
@@ -103,6 +116,13 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)
         .expect("Failed to save win to database");
     println!("Saved win {:?}", win);
+
+    diesel::update(&part)
+        .set((par_dsl::is_win.eq(true),
+              par_dsl::won_at.eq(diesel::dsl::now),
+              par_dsl::win_id.eq(&win.id)))
+        .execute(&conn)
+        .expect("Failed to update participation in database");
 
     let content = MessageBuilder::new()
         .push("Bravo ")
