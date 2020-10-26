@@ -13,7 +13,7 @@ use serenity::{
         CommandResult,
         HelpOptions,
         help_commands,
-        macros::{command, group, help},
+        macros::{command, group, hook, help},
     },
     model::prelude::{Message, UserId},
     utils::{Colour, MessageBuilder},
@@ -307,3 +307,53 @@ async fn cmd_help(
 #[group]
 #[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_cancel_reset, cmd_pic)]
 pub struct General;
+
+#[hook]
+pub async fn on_message(ctx: &Context, msg: &Message) {
+    // Find picture attachment
+    let attachment = match msg.attachments.iter().filter(|a| a.height.is_some()).next() {
+        Some(att) => att,
+        None => return,
+    };
+
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+    let part = Participation::get_current(&conn).expect("Failed to fetch data from db");
+
+    let part: Participation = if let Some(part) = part {
+        // Check the participant
+        if part.player_id != msg.author.id.to_string() {
+            msg.channel_id.say(&ctx.http, ":x: Tut tut tut c'est pas toi qui a la main !").await
+                .expect("Failed to send message");
+            return
+        }
+
+        if part.picture_url.is_none() {
+            diesel::update(&part)
+                .set((par_dsl::picture_url.eq(&attachment.proxy_url)))
+                .get_result(&conn)
+                .expect("Failed to save participation")
+        } else {
+            msg.channel_id.say(&ctx.http, "T'as déjà mis une photo coco.").await
+                .expect("Failed to send message");
+            return
+        }
+    } else {
+        // Create the participation itself as nobody has a hand
+        let part = NewParticipation {
+            player_id: &msg.author.id.to_string(),
+            picture_url: Some(&attachment.proxy_url)
+        };
+        diesel::insert_into(crate::schema::participation::table)
+            .values(part)
+            .get_result(&conn)
+            .expect("Failed to save participation")
+    };
+
+    println!("Saved participation {:?}", part);
+
+    msg.channel_id.say(&ctx.http, "À vos claviers, une nouvelle photo est à trouver :mag_right:")
+        .await
+        .expect("Failed to send message");
+}

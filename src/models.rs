@@ -57,3 +57,10 @@ impl Participation {
         }
     }
 }
+
+#[derive(Insertable, Debug, Clone)]
+#[table_name = "participation"]
+pub struct NewParticipation<'a> {
+    pub player_id: &'a str,
+    pub picture_url: Option<&'a str>,
+}

@@ -42,7 +42,8 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c.allow_dm(false).prefix("!"))
         .group(&bot::GENERAL_GROUP)
-        .help(&bot::CMD_HELP);
+        .help(&bot::CMD_HELP)
+        .normal_message(bot::on_message);
 
     let mut client = Client::new(&config.auth.token)
         .event_handler(Bot)
