@@ -3,12 +3,13 @@ table! {
         id -> Uuid,
         created_at -> Timestamptz,
         player_id -> Text,
-        picture -> Bytea,
+        picture -> Nullable<Bytea>,
         is_win -> Bool,
         won_at -> Nullable<Timestamptz>,
         win_id -> Nullable<Uuid>,
         is_skip -> Bool,
         skipped_at -> Nullable<Timestamptz>,
+        picture_url -> Nullable<Text>,
     }
 }
 

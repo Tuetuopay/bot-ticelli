@@ -33,12 +33,13 @@ pub struct Participation {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
     pub player_id: String,
-    pub picture: Vec<u8>,
+    pub picture: Option<Vec<u8>>,
     pub is_win: bool,
     pub won_at: Option<DateTime<Utc>>,
     pub win_id: Option<Uuid>,
     pub is_skip: bool,
     pub skipped_at: Option<DateTime<Utc>>,
+    pub picture_url: Option<String>,
 }
 
 impl Participation {
