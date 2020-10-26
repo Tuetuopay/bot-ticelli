@@ -111,6 +111,7 @@ dependencies = [
  "chrono",
  "clap",
  "diesel",
+ "futures",
  "serde",
  "serde_derive",
  "serenity",

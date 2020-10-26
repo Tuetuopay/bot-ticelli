@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use diesel::prelude::RunQueryDsl;
+use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl};
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
@@ -97,13 +97,43 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+
+    // select count(id) as cnt, winner_id from win group by winner_id order by cnt desc limit 10;
+    let wins = dsl::win.select((diesel::dsl::sql("count(id) as cnt"), dsl::winner_id))
+        .group_by(dsl::winner_id)
+        .order_by(diesel::dsl::sql::<diesel::sql_types::BigInt>("cnt").desc())
+        .limit(10)
+        .load::<(i64, String)>(&conn)
+        .expect("Failed to load wins from the database");
+
+    let board = wins.into_iter()
+        .enumerate()
+        .map(|(i, (score, id))| async move {
+            let position = match i + 1 {
+                1 => "🥇".to_owned(),
+                2 => "🥈".to_owned(),
+                3 => "🥉".to_owned(),
+                p => p.to_string(),
+            };
+            let user_id = UserId(id.parse().unwrap());
+            match user_id.to_user(ctx.http.clone()).await {
+                Ok(user) => Ok((format!("{}. @{}", position, user.tag()), score.to_string(), false)),
+                Err(e) => Err(e),
+            }
+        });
+
+    let board = futures::future::join_all(board).await
+        .into_iter().collect::<Result<Vec<_>, _>>()
+        .expect("Failed to fetch users");
+
     msg.channel_id.send_message(&ctx.http, |m| {
-        m.embed(|mut e| {
-            e.title("Scoreboard");
-            e.description("Huh?");
+        m.embed(|e| {
+            e.title("👑👑👑 Scores 👑👑👑");
             e.colour(Colour::GOLD);
-            e.field("1", "Foo", false);
-            e.field("2", "Bar", false);
+            e.fields(board);
             e
         });
         m

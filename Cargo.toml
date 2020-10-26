@@ -9,6 +9,7 @@ chrono = "0.4"
 clap = "2.33"
 diesel = { version = "1.4", features = ["r2d2", "postgres", "uuidv07", "chrono"] }
 barrel = "0.6"
+futures = "0.3"
 tokio = { version = "0.2", features = ["rt-threaded"] }
 toml = "0.5"
 serde = "1.0"
