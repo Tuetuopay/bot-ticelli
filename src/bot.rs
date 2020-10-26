@@ -49,33 +49,16 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
-    match msg.mentions.as_slice() {
+    let winner = match msg.mentions.as_slice() {
         [] => {
             let content = MessageBuilder::new()
                 .mention(&msg.author)
                 .push(", cékiki le gagnant ?")
                 .build();
             msg.channel_id.say(&ctx.http, content).await?;
+            return Ok(())
         }
-        [winner] => {
-            let conn = ctx.data.write().await
-                .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-                .get().expect("Failed to connect to database");
-            let win = NewWin {
-                player_id: &msg.author.id.0.to_string(),
-                winner_id: &winner.id.0.to_string(),
-            };
-            let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)
-                .expect("Failed to save win to database");
-            println!("Saved win {:?}", win);
-
-            let content = MessageBuilder::new()
-                .push("Bravo ")
-                .mention(winner)
-                .push(", plus un dans votre pot à moutarde. A vous la main.")
-                .build();
-            msg.channel_id.say(&ctx.http, content).await?;
-        }
+        [winner] => winner,
         [..] => {
             msg.channel_id.say(&ctx.http, MessageBuilder::new()
                 .push("Hé ")
@@ -83,8 +66,27 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
                 .push(", tu serai pas un peu fada ? Un seul gagnant, un seul !")
                 .build()
             ).await?;
+            return Ok(())
         }
     }
+
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+    let win = NewWin {
+        player_id: &msg.author.id.0.to_string(),
+        winner_id: &winner.id.0.to_string(),
+    };
+    let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)
+        .expect("Failed to save win to database");
+    println!("Saved win {:?}", win);
+
+    let content = MessageBuilder::new()
+        .push("Bravo ")
+        .mention(winner)
+        .push(", plus un dans votre pot à moutarde. A vous la main.")
+        .build();
+    msg.channel_id.say(&ctx.http, content).await?;
 
     Ok(())
 }
