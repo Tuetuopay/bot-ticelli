@@ -1,4 +1,18 @@
 table! {
+    participation (id) {
+        id -> Uuid,
+        created_at -> Timestamptz,
+        player_id -> Text,
+        picture -> Bytea,
+        is_win -> Bool,
+        won_at -> Nullable<Timestamptz>,
+        win_id -> Nullable<Uuid>,
+        is_skip -> Bool,
+        skipped_at -> Nullable<Timestamptz>,
+    }
+}
+
+table! {
     win (id) {
         id -> Uuid,
         created_at -> Timestamptz,
@@ -9,3 +23,10 @@ table! {
         reset_id -> Nullable<Uuid>,
     }
 }
+
+joinable!(participation -> win (win_id));
+
+allow_tables_to_appear_in_same_query!(
+    participation,
+    win,
+);
