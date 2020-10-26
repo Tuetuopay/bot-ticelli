@@ -101,8 +101,8 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
         .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
         .get().expect("Failed to connect to database");
 
-    // select count(id) as cnt, winner_id from win group by winner_id order by cnt desc limit 10;
     let wins = dsl::win.select((diesel::dsl::sql("count(id) as cnt"), dsl::winner_id))
+        .filter(dsl::reset.eq(false))
         .group_by(dsl::winner_id)
         .order_by(diesel::dsl::sql::<diesel::sql_types::BigInt>("cnt").desc())
         .limit(10)

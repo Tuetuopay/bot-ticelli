@@ -14,6 +14,9 @@ pub struct Win {
     pub created_at: DateTime<Utc>,
     pub player_id: String,
     pub winner_id: String,
+    pub reset: bool,
+    pub reset_at: Option<DateTime<Utc>>,
+    pub reset_id: Option<Uuid>,
 }
 
 #[derive(Insertable, Debug, Clone)]
