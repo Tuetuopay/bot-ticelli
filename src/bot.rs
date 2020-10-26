@@ -18,6 +18,7 @@ use serenity::{
     model::prelude::{Message, UserId},
     utils::{Colour, MessageBuilder},
 };
+use uuid::Uuid;
 
 use crate::PgPool;
 use crate::models::*;
@@ -141,6 +142,52 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+// TODO only allow admins
+#[command("reset")]
+#[description("Fait un reset des scores")]
+#[num_args(0)]
+#[only_in(guild)]
+async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+
+    let reset_id = Uuid::new_v4();
+    diesel::update(dsl::win.filter(dsl::reset.eq(false)))
+        .set((dsl::reset.eq(true),
+              dsl::reset_at.eq(diesel::dsl::now),
+              dsl::reset_id.eq(reset_id)))
+        .execute(&conn)
+        .expect("Failed to update wins");
+
+    msg.channel_id.say(&ctx.http, format!("Scores reset avec ID {}", reset_id)).await?;
+
+    Ok(())
+}
+
+// TODO only allow admins
+#[command("cancel_reset")]
+#[description("Annule un reset des scores")]
+#[num_args(1)]
+#[only_in(guild)]
+async fn cmd_cancel_reset(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+
+    let reset_id: Uuid = msg.content.split(' ').nth(1).unwrap().parse().unwrap();
+    diesel::update(dsl::win.filter(dsl::reset.eq(true)).filter(dsl::reset_id.eq(reset_id)))
+        .set((dsl::reset.eq(false),
+              dsl::reset_at.eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
+              dsl::reset_id.eq::<Option<Uuid>>(None)))
+        .execute(&conn)
+        .expect("Failed to update wins");
+
+    msg.channel_id.say(&ctx.http, format!("Reset {} annulé", reset_id)).await?;
+
+    Ok(())
+}
+
 #[help]
 #[no_help_available_text("On a pas le cul sorti des ronces, y'a pas d'aide ...")]
 #[usage_sample_label("Exemple")]
@@ -161,5 +208,5 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_cancel_reset)]
 pub struct General;
