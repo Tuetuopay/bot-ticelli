@@ -33,6 +33,28 @@ impl EventHandler for Bot {}
 #[help_available]
 #[only_in(guild)]
 async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await
+        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
+        .get().expect("Failed to connect to database");
+    let part = Participation::get_current(&conn)
+        .expect("Failed to fetch data from database");
+
+    let part = if let Some(part) = part {
+        if part.player_id != msg.author.id.to_string() {
+            msg.channel_id.say(&ctx.http, "Tut tut tut, c'est pas toi qui a la main...").await?;
+            return Ok(())
+        }
+        part
+    } else {
+        msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
+        return Ok(())
+    };
+
+    diesel::update(&part)
+        .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
+        .execute(&conn)
+        .expect("Failed to save skip");
+
     let content = MessageBuilder::new()
         .push("A vos photos, ")
         .mention(&msg.author)
