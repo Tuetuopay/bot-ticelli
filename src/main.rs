@@ -3,7 +3,7 @@ extern crate clap;
 #[macro_use]
 extern crate diesel;
 
-use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
+use diesel::{r2d2::{ConnectionManager, Pool}, PgConnection};
 use serenity::prelude::*;
 use serenity::framework::StandardFramework;
 
@@ -45,7 +45,7 @@ async fn main() {
         .help(&bot::CMD_HELP)
         .normal_message(bot::on_message);
 
-    let mut client = Client::new(&config.auth.token)
+    let mut client = Client::builder(&config.auth.token)
         .event_handler(Bot)
         .framework(framework)
         .await

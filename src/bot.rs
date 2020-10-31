@@ -152,9 +152,9 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         player_id: &win.winner_id,
         picture_url: None,
     };
-    let part: Participation = diesel::insert_into(crate::schema::participation::table)
+    diesel::insert_into(crate::schema::participation::table)
         .values(part)
-        .get_result(&conn)
+        .get_result::<Participation>(&conn)
         .expect("Failed to save participation");
 
     let content = MessageBuilder::new()
@@ -351,7 +351,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
         if part.picture_url.is_none() {
             diesel::update(&part)
-                .set((par_dsl::picture_url.eq(&attachment.proxy_url)))
+                .set(par_dsl::picture_url.eq(&attachment.proxy_url))
                 .get_result(&conn)
                 .expect("Failed to save participation")
         } else {
