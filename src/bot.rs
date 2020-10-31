@@ -137,6 +137,16 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         .execute(&conn)
         .expect("Failed to update participation in database");
 
+    // Mark winner as new participant
+    let part = NewParticipation {
+        player_id: &win.winner_id,
+        picture_url: None,
+    };
+    let part: Participation = diesel::insert_into(crate::schema::participation::table)
+        .values(part)
+        .get_result(&conn)
+        .expect("Failed to save participation");
+
     let content = MessageBuilder::new()
         .push("Bravo ")
         .mention(winner)
