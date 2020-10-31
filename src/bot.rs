@@ -207,7 +207,7 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 
     msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
-            e.title("👑👑👑 Scores 👑👑👑");
+            e.title("👑 👑 👑 Scores 👑 👑 👑");
             e.colour(Colour::GOLD);
             e.fields(board);
             e
@@ -308,7 +308,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
 #[help]
 #[no_help_available_text("On a pas le cul sorti des ronces, y'a pas d'aide ...")]
 #[usage_sample_label("Exemple")]
-#[guild_only_text("Pas de DM p'tit coquin :smirk:")]
+#[guild_only_text("Pas de DM p'tit coquin 😏")]
 #[command_not_found_text("V'là qu'il utilise une commande inexistante. Y'en a vraiment qui ont pas \
     la lumière à tous les étages ...")]
 #[strikethrough_commands_tip_in_guild("~~`Les commandes barrées`~~ sont indispo parce qu'on avait pas envie.")]
@@ -344,7 +344,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let part: Participation = if let Some(part) = part {
         // Check the participant
         if part.player_id != msg.author.id.to_string() {
-            msg.channel_id.say(&ctx.http, ":x: Tut tut tut c'est pas toi qui a la main !").await
+            msg.channel_id.say(&ctx.http, "❌ Tut tut tut c'est pas toi qui a la main !").await
                 .expect("Failed to send message");
             return
         }
@@ -373,7 +373,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     println!("Saved participation {:?}", part);
 
-    msg.channel_id.say(&ctx.http, "À vos claviers, une nouvelle photo est à trouver :mag_right:")
+    msg.channel_id.say(&ctx.http, "À vos claviers, une nouvelle photo est à trouver 🔎")
         .await
         .expect("Failed to send message");
 }
