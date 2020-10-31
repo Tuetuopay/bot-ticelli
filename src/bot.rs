@@ -33,11 +33,8 @@ impl EventHandler for Bot {}
 #[help_available]
 #[only_in(guild)]
 async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
-    let part = Participation::get_current(&conn)
-        .expect("Failed to fetch data from database");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let part = Participation::get_current(&conn)?;
 
     let part = if let Some(part) = part {
         if part.player_id != msg.author.id.to_string() {
@@ -52,8 +49,7 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 
     diesel::update(&part)
         .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
-        .execute(&conn)
-        .expect("Failed to save skip");
+        .execute(&conn)?;
 
     let content = MessageBuilder::new()
         .push("A vos photos, ")
@@ -94,11 +90,9 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let part = Participation::get_current(&conn).expect("Failed to fetch data from database");
+    let part = Participation::get_current(&conn)?;
     let part = if let Some(part) = part {
         part
     } else {
@@ -135,8 +129,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         player_id: &msg.author.id.0.to_string(),
         winner_id: &winner.id.0.to_string(),
     };
-    let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)
-        .expect("Failed to save win to database");
+    let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)?;
     println!("Saved win {:?}", win);
 
     // Mark participation as won
@@ -144,8 +137,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         .set((par_dsl::is_win.eq(true),
               par_dsl::won_at.eq(diesel::dsl::now),
               par_dsl::win_id.eq(&win.id)))
-        .execute(&conn)
-        .expect("Failed to update participation in database");
+        .execute(&conn)?;
 
     // Mark winner as new participant
     let part = NewParticipation {
@@ -154,8 +146,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     };
     diesel::insert_into(crate::schema::participation::table)
         .values(part)
-        .get_result::<Participation>(&conn)
-        .expect("Failed to save participation");
+        .get_result::<Participation>(&conn)?;
 
     let content = MessageBuilder::new()
         .push("Bravo ")
@@ -173,17 +164,14 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let wins = dsl::win.select((diesel::dsl::sql("count(id) as cnt"), dsl::winner_id))
         .filter(dsl::reset.eq(false))
         .group_by(dsl::winner_id)
         .order_by(diesel::dsl::sql::<diesel::sql_types::BigInt>("cnt").desc())
         .limit(10)
-        .load::<(i64, String)>(&conn)
-        .expect("Failed to load wins from the database");
+        .load::<(i64, String)>(&conn)?;
 
     let board = wins.into_iter()
         .enumerate()
@@ -202,8 +190,7 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
         });
 
     let board = futures::future::join_all(board).await
-        .into_iter().collect::<Result<Vec<_>, _>>()
-        .expect("Failed to fetch users");
+        .into_iter().collect::<Result<Vec<_>, _>>()?;
 
     msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
@@ -223,17 +210,14 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 #[only_in(guild)]
 async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let reset_id = Uuid::new_v4();
     diesel::update(dsl::win.filter(dsl::reset.eq(false)))
         .set((dsl::reset.eq(true),
               dsl::reset_at.eq(diesel::dsl::now),
               dsl::reset_id.eq(reset_id)))
-        .execute(&conn)
-        .expect("Failed to update wins");
+        .execute(&conn)?;
 
     msg.channel_id.say(&ctx.http, format!("Scores reset avec ID {}", reset_id)).await?;
 
@@ -246,17 +230,14 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(1)]
 #[only_in(guild)]
 async fn cmd_cancel_reset(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let reset_id: Uuid = msg.content.split(' ').nth(1).unwrap().parse().unwrap();
     diesel::update(dsl::win.filter(dsl::reset.eq(true)).filter(dsl::reset_id.eq(reset_id)))
         .set((dsl::reset.eq(false),
               dsl::reset_at.eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
               dsl::reset_id.eq::<Option<Uuid>>(None)))
-        .execute(&conn)
-        .expect("Failed to update wins");
+        .execute(&conn)?;
 
     msg.channel_id.say(&ctx.http, format!("Reset {} annulé", reset_id)).await?;
 
@@ -269,10 +250,8 @@ async fn cmd_cancel_reset(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
-    let part = Participation::get_current(&conn).expect("Failed to fetch data from db");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let part = Participation::get_current(&conn)?;
 
     let (part, url) = if let Some(part) = part {
         match part.picture_url.clone() {
@@ -292,8 +271,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
         return Ok(())
     };
 
-    let player = UserId(part.player_id.parse().unwrap()).to_user(&ctx.http).await
-        .expect("Failed to fetch user");
+    let player = UserId(part.player_id.parse().unwrap()).to_user(&ctx.http).await?;
 
     msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
@@ -330,34 +308,35 @@ pub struct General;
 
 #[hook]
 pub async fn on_message(ctx: &Context, msg: &Message) {
+    if let Err(e) = _on_message(ctx, msg).await {
+        println!("Failed to handle message: {}", e);
+    }
+}
+
+async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::error::Error>> {
     // Find picture attachment
     let attachment = match msg.attachments.iter().filter(|a| a.height.is_some()).next() {
         Some(att) => att,
-        None => return,
+        None => return Ok(()),
     };
 
-    let conn = ctx.data.write().await
-        .get_mut::<PgPool>().expect("Failed to retrieve connection pool")
-        .get().expect("Failed to connect to database");
-    let part = Participation::get_current(&conn).expect("Failed to fetch data from db");
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let part = Participation::get_current(&conn)?;
 
     let part: Participation = if let Some(part) = part {
         // Check the participant
         if part.player_id != msg.author.id.to_string() {
-            msg.channel_id.say(&ctx.http, "❌ Tut tut tut c'est pas toi qui a la main !").await
-                .expect("Failed to send message");
-            return
+            msg.channel_id.say(&ctx.http, "❌ Tut tut tut c'est pas toi qui a la main !").await?;
+            return Ok(())
         }
 
         if part.picture_url.is_none() {
             diesel::update(&part)
                 .set(par_dsl::picture_url.eq(&attachment.proxy_url))
-                .get_result(&conn)
-                .expect("Failed to save participation")
+                .get_result(&conn)?
         } else {
-            msg.channel_id.say(&ctx.http, "T'as déjà mis une photo coco.").await
-                .expect("Failed to send message");
-            return
+            msg.channel_id.say(&ctx.http, "T'as déjà mis une photo coco.").await?;
+            return Ok(())
         }
     } else {
         // Create the participation itself as nobody has a hand
@@ -367,13 +346,13 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         };
         diesel::insert_into(crate::schema::participation::table)
             .values(part)
-            .get_result(&conn)
-            .expect("Failed to save participation")
+            .get_result(&conn)?
     };
 
     println!("Saved participation {:?}", part);
 
     msg.channel_id.say(&ctx.http, "À vos claviers, une nouvelle photo est à trouver 🔎")
-        .await
-        .expect("Failed to send message");
+        .await?;
+
+    Ok(())
 }
