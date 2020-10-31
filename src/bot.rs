@@ -72,6 +72,7 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
+    // Check that a single winner is mentioned
     let winner = match msg.mentions.as_slice() {
         [] => {
             let content = MessageBuilder::new()
@@ -99,16 +100,23 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 
     let part = Participation::get_current(&conn).expect("Failed to fetch data from database");
     let part = if let Some(part) = part {
-        if part.player_id != msg.author.id.to_string() {
-            msg.channel_id.say(&ctx.http, "Tut tut tut, c'est pas toi qui a la main...").await?;
-            return Ok(())
-        }
         part
     } else {
         msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
         return Ok(())
     };
 
+    // Check that participation is valid
+    if part.player_id != msg.author.id.to_string() {
+        msg.channel_id.say(&ctx.http, "Tut tut tut, c'est pas toi qui a la main...").await?;
+        return Ok(())
+    }
+    if part.picture_url.is_none() {
+        msg.channel_id.say(&ctx.http, "Hrmpf t'as pas mis de photo toi ...").await?;
+        return Ok(())
+    }
+
+    // Check that winner is valid (neither current participant nor a bot)
     if winner.bot {
         msg.channel_id.say(&ctx.http, "Tg le bot !").await?;
         return Ok(())
@@ -122,6 +130,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         return Ok(())
     }
 
+    // Save the win
     let win = NewWin {
         player_id: &msg.author.id.0.to_string(),
         winner_id: &winner.id.0.to_string(),
@@ -130,6 +139,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
         .expect("Failed to save win to database");
     println!("Saved win {:?}", win);
 
+    // Mark participation as won
     diesel::update(&part)
         .set((par_dsl::is_win.eq(true),
               par_dsl::won_at.eq(diesel::dsl::now),
