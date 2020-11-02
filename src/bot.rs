@@ -213,7 +213,6 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-// TODO only allow admins
 #[command("reset")]
 #[description("Gère le reset des scores")]
 #[usage("[do|list|cancel <id>]")]
