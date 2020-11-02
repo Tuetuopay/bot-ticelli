@@ -231,11 +231,7 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
     let game = msg.game(&conn)?;
     let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
-        Some(_) => {
-            no_participant(ctx, msg).await?;
-            return Ok(())
-        }
+        Some((game, part)) => (game, part),
         None => return Ok(()),
     };
 
