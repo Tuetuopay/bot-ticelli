@@ -174,9 +174,16 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guild)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let game = msg.game(&conn)?;
+    let game = match game {
+        Some((game, _)) => game,
+        None => return Ok(()),
+    };
 
-    let wins = dsl::win.select((diesel::dsl::sql("count(id) as cnt"), dsl::winner_id))
+    let wins = dsl::win.select((diesel::dsl::sql("count(win.id) as cnt"), dsl::winner_id))
         .filter(dsl::reset.eq(false))
+        .inner_join(par_dsl::participation)
+        .filter(par_dsl::game_id.eq(&game.id))
         .group_by(dsl::winner_id)
         .order_by(diesel::dsl::sql::<diesel::sql_types::BigInt>("cnt").desc())
         .limit(10)
