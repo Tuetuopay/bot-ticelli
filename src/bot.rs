@@ -370,6 +370,8 @@ pub struct General;
 
 #[hook]
 pub async fn on_message(ctx: &Context, msg: &Message) {
+    tokio::spawn(log_message(ctx.clone(), msg.clone()));
+
     if let Err(e) = _on_message(ctx, msg).await {
         println!("Failed to handle message: {}", e);
     }
@@ -421,4 +423,26 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
     new_pic_available(ctx, msg).await?;
 
     return Ok(())
+}
+
+async fn log_message(ctx: Context, msg: Message) {
+    let guild = match msg.guild_id {
+        Some(guild) => match guild.name(&ctx.cache).await {
+            Some(name) => format!("[{}]", name),
+            None => "(unknown)".to_owned(),
+        },
+        None => "(DM)".to_owned(),
+    };
+    let chan = match msg.channel_id.name(&ctx.cache) .await{
+        Some(name) => format!("#{}", name),
+        None => "?#".to_owned(),
+    };
+    println!(
+        "({}) {} {} @{}: {}",
+        msg.id,
+        guild,
+        chan,
+        msg.author.tag(),
+        msg.content_safe(&ctx.cache).await,
+    );
 }
