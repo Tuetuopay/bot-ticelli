@@ -4,7 +4,9 @@
 
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl};
+use itertools::Itertools;
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
@@ -207,42 +209,63 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 
 // TODO only allow admins
 #[command("reset")]
-#[description("Fait un reset des scores")]
-#[num_args(0)]
+#[description("Gère le reset des scores")]
+#[usage("[do|list|cancel <id>]")]
+#[min_args(1)]
+#[max_args(2)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
 async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let reset_id = Uuid::new_v4();
-    diesel::update(dsl::win.filter(dsl::reset.eq(false)))
-        .set((dsl::reset.eq(true),
-              dsl::reset_at.eq(diesel::dsl::now),
-              dsl::reset_id.eq(reset_id)))
-        .execute(&conn)?;
+    match msg.content.split(' ').collect::<Vec<_>>().as_slice() {
+        [_, "do"] => {
+            let reset_id = Uuid::new_v4();
+            diesel::update(dsl::win.filter(dsl::reset.eq(false)))
+                .set((dsl::reset.eq(true),
+                      dsl::reset_at.eq(diesel::dsl::now),
+                      dsl::reset_id.eq(reset_id)))
+                .execute(&conn)?;
 
-    msg.channel_id.say(&ctx.http, format!("Scores reset avec ID {}", reset_id)).await?;
+            msg.channel_id.say(&ctx.http, format!("Scores reset avec ID {}", reset_id)).await?;
+        }
+        [_, "list"] => {
+            use diesel::sql_types::Timestamptz;
+            let resets = dsl::win
+                .select((dsl::reset_id, diesel::dsl::sql::<Timestamptz>("max(reset_at) as rst")))
+                .filter(dsl::reset.eq(true))
+                .filter(diesel::dsl::sql("true group by reset_id"))
+                .order_by(diesel::dsl::sql::<Timestamptz>("rst"))
+                .load::<(Option<Uuid>, DateTime<Utc>)>(&conn)?
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, (id, at))| match id {
+                    Some(id) => Some(format!("{}. {} à {}", i + 1, id, at)),
+                    _ => None,
+                })
+                .join("\n");
+            msg.channel_id.say(&ctx.http, format!("Resets:\n{}", resets)).await?;
+        }
+        [_, "cancel", id] => {
+            let reset_id: Uuid = match id.parse() {
+                Ok(id) => id,
+                Err(_) => {
+                    msg.channel_id.say(&ctx.http, "ID de reset invalide").await?;
+                    return Ok(())
+                }
+            };
+            diesel::update(dsl::win.filter(dsl::reset.eq(true)).filter(dsl::reset_id.eq(reset_id)))
+                .set((dsl::reset.eq(false),
+                      dsl::reset_at.eq::<Option<DateTime<Utc>>>(None),
+                      dsl::reset_id.eq::<Option<Uuid>>(None)))
+                .execute(&conn)?;
 
-    Ok(())
-}
-
-// TODO only allow admins
-#[command("cancel_reset")]
-#[description("Annule un reset des scores")]
-#[num_args(1)]
-#[only_in(guild)]
-#[required_permissions(ADMINISTRATOR)]
-async fn cmd_cancel_reset(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-
-    let reset_id: Uuid = msg.content.split(' ').nth(1).unwrap().parse().unwrap();
-    diesel::update(dsl::win.filter(dsl::reset.eq(true)).filter(dsl::reset_id.eq(reset_id)))
-        .set((dsl::reset.eq(false),
-              dsl::reset_at.eq::<Option<chrono::DateTime<chrono::Utc>>>(None),
-              dsl::reset_id.eq::<Option<Uuid>>(None)))
-        .execute(&conn)?;
-
-    msg.channel_id.say(&ctx.http, format!("Reset {} annulé", reset_id)).await?;
+            msg.channel_id.say(&ctx.http, format!("Reset {} annulé", reset_id)).await?;
+        }
+        [..] => {
+            msg.channel_id.say(&ctx.http, "Arguments inconnus.").await?;
+        }
+    }
 
     Ok(())
 }
@@ -306,7 +329,7 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_cancel_reset, cmd_pic)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic)]
 pub struct General;
 
 #[hook]
