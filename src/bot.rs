@@ -210,6 +210,7 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Fait un reset des scores")]
 #[num_args(0)]
 #[only_in(guild)]
+#[required_permissions(ADMINISTRATOR)]
 async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
@@ -230,6 +231,7 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Annule un reset des scores")]
 #[num_args(1)]
 #[only_in(guild)]
+#[required_permissions(ADMINISTRATOR)]
 async fn cmd_cancel_reset(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
