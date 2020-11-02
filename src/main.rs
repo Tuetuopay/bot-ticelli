@@ -3,12 +3,13 @@ extern crate clap;
 #[macro_use]
 extern crate diesel;
 
-use diesel::{r2d2::{ConnectionManager, Pool}, PgConnection};
+use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
 use serenity::prelude::*;
 use serenity::framework::StandardFramework;
 
 mod bot;
 mod config;
+mod extensions;
 mod schema;
 mod messages;
 mod models;
@@ -19,6 +20,7 @@ struct PgPool;
 impl TypeMapKey for PgPool {
     type Value = Pool<ConnectionManager<PgConnection>>;
 }
+pub type PgPooledConn = PooledConnection<ConnectionManager<PgConnection>>;
 
 #[tokio::main]
 async fn main() {

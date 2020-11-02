@@ -23,6 +23,7 @@ use serenity::{
 use uuid::Uuid;
 
 use crate::PgPool;
+use crate::extensions::MessageExt;
 use crate::messages::*;
 use crate::models::*;
 
@@ -37,18 +38,21 @@ impl EventHandler for Bot {}
 #[only_in(guild)]
 async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let part = Participation::get_current(&conn)?;
+    let game = msg.game(&conn)?;
 
-    let part = if let Some(part) = part {
-        if part.player_id != msg.author.id.to_string() {
-            not_your_turn(ctx, msg).await?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => {
+            no_participant(ctx, msg).await?;
             return Ok(())
         }
-        part
-    } else {
-        no_participant(ctx, msg).await?;
-        return Ok(())
+        None => return Ok(()),
     };
+
+    if part.player_id != msg.author.id.to_string() {
+        not_your_turn(ctx, msg).await?;
+        return Ok(())
+    }
 
     diesel::update(&part)
         .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
@@ -94,13 +98,14 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     };
 
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-
-    let part = Participation::get_current(&conn)?;
-    let part = if let Some(part) = part {
-        part
-    } else {
-        no_participant(ctx, msg).await?;
-        return Ok(())
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => {
+            no_participant(ctx, msg).await?;
+            return Ok(())
+        }
+        None => return Ok(()),
     };
 
     // Check that participation is valid
@@ -146,6 +151,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     let part = NewParticipation {
         player_id: &win.winner_id,
         picture_url: None,
+        game_id: &game.id,
     };
     diesel::insert_into(crate::schema::participation::table)
         .values(part)
@@ -277,24 +283,27 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guild)]
 async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let part = Participation::get_current(&conn)?;
-
-    let (part, url) = if let Some(part) = part {
-        match part.picture_url.clone() {
-            Some(url) => (part, url),
-            None => {
-                let content = MessageBuilder::new()
-                    .push("C'est au tour de ")
-                    .mention(&UserId(part.player_id.parse().unwrap()))
-                    .push(", mais il a pas posté de photo.")
-                    .build();
-                msg.channel_id.say(&ctx.http, content).await?;
-                return Ok(())
-            }
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => {
+            no_participant(ctx, msg).await?;
+            return Ok(())
         }
-    } else {
-        no_participant(ctx, msg).await?;
-        return Ok(())
+        None => return Ok(()),
+    };
+
+    let url = match part.picture_url {
+        Some(ref url) => url,
+        None => {
+            let content = MessageBuilder::new()
+                .push("C'est au tour de ")
+                .mention(&UserId(part.player_id.parse().unwrap()))
+                .push(", mais il a pas posté de photo.")
+                .build();
+            msg.channel_id.say(&ctx.http, content).await?;
+            return Ok(())
+        }
     };
 
     let player = UserId(part.player_id.parse().unwrap()).to_user(&ctx.http).await?;
@@ -347,7 +356,11 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
     };
 
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let part = Participation::get_current(&conn)?;
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some(s) => s,
+        None => return Ok(()),
+    };
 
     let part: Participation = if let Some(part) = part {
         // Check the participant
@@ -368,7 +381,8 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
         // Create the participation itself as nobody has a hand
         let part = NewParticipation {
             player_id: &msg.author.id.to_string(),
-            picture_url: Some(&attachment.proxy_url)
+            picture_url: Some(&attachment.proxy_url),
+            game_id: &game.id,
         };
         diesel::insert_into(crate::schema::participation::table)
             .values(part)

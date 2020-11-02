@@ -3,9 +3,11 @@
  */
 
 use chrono::{DateTime, Utc};
-use diesel::{prelude::*, PgConnection, result::Error as DError};
+use diesel::{prelude::*, result::Error as DError};
+use serenity::model::id::{ChannelId, GuildId};
 use uuid::Uuid;
 
+use crate::PgPooledConn;
 pub use crate::schema::{
     win, win::dsl,
     participation, participation::dsl as par_dsl,
@@ -47,7 +49,7 @@ pub struct Participation {
 }
 
 impl Participation {
-    pub fn get_current(conn: &PgConnection) -> Result<Option<Participation>, DError> {
+    pub fn get_current(conn: &PgPooledConn) -> Result<Option<Participation>, DError> {
         let part = par_dsl::participation
             .filter(par_dsl::is_win.eq(false))
             .filter(par_dsl::is_skip.eq(false))
@@ -78,6 +80,33 @@ pub struct Game {
     pub guild_id: String,
     pub channel_id: String,
     pub creator_id: String,
+}
+
+impl Game {
+    pub fn get(conn: &PgPooledConn, guild_id: u64, chan_id: u64) -> Result<Option<Game>, DError> {
+        game_dsl::game
+            .filter(game_dsl::guild_id.eq(guild_id.to_string()))
+            .filter(game_dsl::channel_id.eq(chan_id.to_string()))
+            .first(conn)
+            .optional()
+    }
+
+    pub fn get_with_part(
+        conn: &PgPooledConn,
+        guild_id: u64,
+        chan_id: u64
+    ) -> Result<Option<(Game, Option<Participation>)>, DError> {
+        game_dsl::game
+            .filter(game_dsl::guild_id.eq(guild_id.to_string()))
+            .filter(game_dsl::channel_id.eq(chan_id.to_string()))
+            .left_join(participation::table.on(
+                game_dsl::id.eq(par_dsl::game_id)
+                    .and(par_dsl::is_skip.eq(false))
+                    .and(par_dsl::is_win.eq(false))
+            ))
+            .first(conn)
+            .optional()
+    }
 }
 
 #[derive(Insertable, Debug, Clone)]
