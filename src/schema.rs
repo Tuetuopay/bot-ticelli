@@ -3,7 +3,6 @@ table! {
         id -> Uuid,
         created_at -> Timestamptz,
         player_id -> Text,
-        picture -> Nullable<Bytea>,
         is_win -> Bool,
         won_at -> Nullable<Timestamptz>,
         win_id -> Nullable<Uuid>,
