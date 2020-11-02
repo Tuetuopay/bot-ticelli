@@ -21,6 +21,7 @@ use serenity::{
 use uuid::Uuid;
 
 use crate::PgPool;
+use crate::messages::*;
 use crate::models::*;
 
 pub struct Bot;
@@ -38,12 +39,12 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 
     let part = if let Some(part) = part {
         if part.player_id != msg.author.id.to_string() {
-            msg.channel_id.say(&ctx.http, "Tut tut tut, c'est pas toi qui a la main...").await?;
+            not_your_turn(ctx, msg).await?;
             return Ok(())
         }
         part
     } else {
-        msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
+        no_participant(ctx, msg).await?;
         return Ok(())
     };
 
@@ -96,23 +97,23 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     let part = if let Some(part) = part {
         part
     } else {
-        msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
+        no_participant(ctx, msg).await?;
         return Ok(())
     };
 
     // Check that participation is valid
     if part.player_id != msg.author.id.to_string() {
-        msg.channel_id.say(&ctx.http, "Tut tut tut, c'est pas toi qui a la main...").await?;
+        not_your_turn(ctx, msg).await?;
         return Ok(())
     }
     if part.picture_url.is_none() {
-        msg.channel_id.say(&ctx.http, "Hrmpf t'as pas mis de photo toi ...").await?;
+        you_posted_no_pic(ctx, msg).await?;
         return Ok(())
     }
 
     // Check that winner is valid (neither current participant nor a bot)
     if winner.bot {
-        msg.channel_id.say(&ctx.http, "Tg le bot !").await?;
+        stfu_bot(ctx, msg).await?;
         return Ok(())
     }
     if winner.id == msg.author.id {
@@ -267,7 +268,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
             }
         }
     } else {
-        msg.channel_id.say(&ctx.http, "Mais personne n'a la main ...").await?;
+        no_participant(ctx, msg).await?;
         return Ok(())
     };
 
@@ -326,7 +327,7 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
     let part: Participation = if let Some(part) = part {
         // Check the participant
         if part.player_id != msg.author.id.to_string() {
-            msg.channel_id.say(&ctx.http, "❌ Tut tut tut c'est pas toi qui a la main !").await?;
+            not_your_turn(ctx, msg).await?;
             return Ok(())
         }
 
@@ -335,7 +336,7 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
                 .set(par_dsl::picture_url.eq(&attachment.proxy_url))
                 .get_result(&conn)?
         } else {
-            msg.channel_id.say(&ctx.http, "T'as déjà mis une photo coco.").await?;
+            pic_already_posted(ctx, msg).await?;
             return Ok(())
         }
     } else {
@@ -351,8 +352,7 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
 
     println!("Saved participation {:?}", part);
 
-    msg.channel_id.say(&ctx.http, "À vos claviers, une nouvelle photo est à trouver 🔎")
-        .await?;
+    new_pic_available(ctx, msg).await?;
 
-    Ok(())
+    return Ok(())
 }

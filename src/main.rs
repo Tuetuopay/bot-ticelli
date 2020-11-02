@@ -10,6 +10,7 @@ use serenity::framework::StandardFramework;
 mod bot;
 mod config;
 mod schema;
+mod messages;
 mod models;
 
 use bot::Bot;
