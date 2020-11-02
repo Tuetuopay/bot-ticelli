@@ -1,4 +1,14 @@
 table! {
+    game (id) {
+        id -> Uuid,
+        created_at -> Timestamptz,
+        guild_id -> Text,
+        channel_id -> Text,
+        creator_id -> Text,
+    }
+}
+
+table! {
     participation (id) {
         id -> Uuid,
         created_at -> Timestamptz,
@@ -9,6 +19,7 @@ table! {
         is_skip -> Bool,
         skipped_at -> Nullable<Timestamptz>,
         picture_url -> Nullable<Text>,
+        game_id -> Uuid,
     }
 }
 
@@ -24,9 +35,11 @@ table! {
     }
 }
 
+joinable!(participation -> game (game_id));
 joinable!(participation -> win (win_id));
 
 allow_tables_to_appear_in_same_query!(
+    game,
     participation,
     win,
 );

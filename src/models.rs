@@ -3,10 +3,14 @@
  */
 
 use chrono::{DateTime, Utc};
-use diesel::{ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, result::Error as DError};
+use diesel::{prelude::*, PgConnection, result::Error as DError};
 use uuid::Uuid;
 
-pub use crate::schema::{win, win::dsl, participation, participation::dsl as par_dsl};
+pub use crate::schema::{
+    win, win::dsl,
+    participation, participation::dsl as par_dsl,
+    game, game::dsl as game_dsl,
+};
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
 #[table_name = "win"]
@@ -39,6 +43,7 @@ pub struct Participation {
     pub is_skip: bool,
     pub skipped_at: Option<DateTime<Utc>>,
     pub picture_url: Option<String>,
+    pub game_id: Uuid,
 }
 
 impl Participation {
@@ -62,4 +67,23 @@ impl Participation {
 pub struct NewParticipation<'a> {
     pub player_id: &'a str,
     pub picture_url: Option<&'a str>,
+    pub game_id: &'a Uuid,
+}
+
+#[derive(Queryable, Identifiable, Debug, Clone)]
+#[table_name = "game"]
+pub struct Game {
+    pub id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub creator_id: String,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[table_name = "game"]
+pub struct NewGame<'a> {
+    pub guild_id: &'a str,
+    pub channel_id: &'a str,
+    pub creator_id: &'a str,
 }
