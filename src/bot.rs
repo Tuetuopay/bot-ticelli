@@ -54,9 +54,7 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
         return Ok(())
     }
 
-    diesel::update(&part)
-        .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
-        .execute(&conn)?;
+    part.skip(&conn)?;
 
     let content = MessageBuilder::new()
         .push("A vos photos, ")
@@ -254,6 +252,11 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
                       dsl::reset_at.eq(diesel::dsl::now),
                       dsl::reset_id.eq(reset_id)))
                 .execute(&conn)?;
+
+            // Mark the current participation as skipped (if any)
+            if let Some(part) = part {
+                part.skip(&conn)?;
+            }
 
             msg.channel_id.say(&ctx.http, format!("Scores reset avec ID {}", reset_id)).await?;
         }

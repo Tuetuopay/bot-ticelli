@@ -62,6 +62,12 @@ impl Participation {
             },
         }
     }
+
+    pub fn skip(&self, conn: &PgPooledConn) -> Result<Self, DError> {
+        diesel::update(self)
+            .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
+            .get_result(conn)
+    }
 }
 
 #[derive(Insertable, Debug, Clone)]
