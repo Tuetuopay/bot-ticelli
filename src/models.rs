@@ -4,7 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use diesel::{prelude::*, result::Error as DError};
-use serenity::model::id::{ChannelId, GuildId};
+use serenity::model::id::UserId;
 use uuid::Uuid;
 
 use crate::PgPooledConn;
@@ -67,6 +67,10 @@ impl Participation {
         diesel::update(self)
             .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
             .get_result(conn)
+    }
+
+    pub fn player(&self) -> UserId {
+        UserId(self.player_id.parse().unwrap())
     }
 }
 

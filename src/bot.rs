@@ -325,7 +325,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
         None => {
             let content = MessageBuilder::new()
                 .push("C'est au tour de ")
-                .mention(&UserId(part.player_id.parse().unwrap()))
+                .mention(&part.player())
                 .push(", mais il a pas posté de photo.")
                 .build();
             msg.channel_id.say(&ctx.http, content).await?;
@@ -333,7 +333,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
-    let player = UserId(part.player_id.parse().unwrap()).to_user(&ctx.http).await?;
+    let player = part.player().to_user(&ctx.http).await?;
 
     msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
@@ -342,6 +342,34 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
         })
     }).await?;
 
+    Ok(())
+}
+
+#[command("force_skip")]
+#[description("Force la main à passer")]
+#[num_args(0)]
+#[only_in(guild)]
+#[required_permissions(ADMINISTRATOR)]
+async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => {
+            no_participant(ctx, msg).await?;
+            return Ok(())
+        }
+        None => return Ok(()),
+    };
+
+    part.skip(&conn)?;
+
+    let content = MessageBuilder::new()
+        .push("A vos photos, ")
+        .mention(&part.player())
+        .push(" n'a plus la main, on y a coupé court !")
+        .build();
+    msg.channel_id.say(&ctx.http, content).await?;
     Ok(())
 }
 
@@ -365,7 +393,7 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip)]
 pub struct General;
 
 #[hook]
