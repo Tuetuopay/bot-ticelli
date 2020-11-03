@@ -441,7 +441,7 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
     let part: Participation = if let Some(part) = part {
         // Check the participant
         if part.player_id != msg.author.id.to_string() {
-            not_your_turn(ctx, msg).await?;
+            // Don't send any error message as this is annoying when people post guess pics etc
             return Ok(())
         }
 
