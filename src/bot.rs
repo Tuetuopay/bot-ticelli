@@ -73,6 +73,27 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => {
+            no_participant(ctx, msg).await?;
+            return Ok(())
+        }
+        None => return Ok(()),
+    };
+
+    // Check that participation is valid
+    if part.player_id != msg.author.id.to_string() {
+        not_your_turn(ctx, msg).await?;
+        return Ok(())
+    }
+    if part.picture_url.is_none() {
+        you_posted_no_pic(ctx, msg).await?;
+        return Ok(())
+    }
+
     // Check that a single winner is mentioned
     let winner = match msg.mentions.as_slice() {
         [] => {
@@ -94,27 +115,6 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
             return Ok(())
         }
     };
-
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
-        Some(_) => {
-            no_participant(ctx, msg).await?;
-            return Ok(())
-        }
-        None => return Ok(()),
-    };
-
-    // Check that participation is valid
-    if part.player_id != msg.author.id.to_string() {
-        not_your_turn(ctx, msg).await?;
-        return Ok(())
-    }
-    if part.picture_url.is_none() {
-        you_posted_no_pic(ctx, msg).await?;
-        return Ok(())
-    }
 
     // Check that winner is valid (neither current participant nor a bot)
     if winner.bot {
