@@ -346,7 +346,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[help]
-#[no_help_available_text("On a pas le cul sorti des ronces, y'a pas d'aide ...")]
+#[no_help_available_text("Commande inexistante")]
 #[usage_sample_label("Exemple")]
 #[guild_only_text("Pas de DM p'tit coquin 😏")]
 #[command_not_found_text("V'là qu'il utilise une commande inexistante. Y'en a vraiment qui ont pas \
