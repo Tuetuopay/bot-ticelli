@@ -29,3 +29,7 @@ pub async fn pic_already_posted(ctx: &Context, msg: &Message) -> Result {
 pub async fn new_pic_available(ctx: &Context, msg: &Message) -> Result {
     msg.channel_id.say(&ctx.http, "🔎 À vos claviers, une nouvelle photo est à trouver").await
 }
+
+pub async fn invalid_page(ctx: &Context, msg: &Message) -> Result {
+    msg.channel_id.say(&ctx.http, "Page invalide").await
+}

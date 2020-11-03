@@ -26,6 +26,7 @@ use crate::PgPool;
 use crate::extensions::MessageExt;
 use crate::messages::*;
 use crate::models::*;
+use crate::paginate::*;
 
 pub struct Bot;
 
@@ -167,7 +168,10 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command("show")]
 #[description("Afficher le scoreboard")]
-#[num_args(0)]
+#[min_args(0)]
+#[max_args(1)]
+#[usage("[page]")]
+#[example("1")]
 #[help_available]
 #[only_in(guild)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
@@ -178,19 +182,34 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
         None => return Ok(()),
     };
 
-    let wins = dsl::win.select((diesel::dsl::sql("count(win.id) as cnt"), dsl::winner_id))
+    let page = msg.content.split(' ').nth(1).map(|p| p.parse().ok()).flatten().unwrap_or(1);
+    let per_page = 10;
+
+    if page < 1 {
+        invalid_page(ctx, msg).await?;
+        return Ok(())
+    }
+
+    let (wins, count) = dsl::win.select((diesel::dsl::sql("count(win.id) as cnt"), dsl::winner_id))
         .filter(dsl::reset.eq(false))
         .inner_join(par_dsl::participation)
         .filter(par_dsl::game_id.eq(&game.id))
         .group_by(dsl::winner_id)
         .order_by(diesel::dsl::sql::<diesel::sql_types::BigInt>("cnt").desc())
-        .limit(10)
-        .load::<(i64, String)>(&conn)?;
+        .paginate(page)
+        .per_page(per_page)
+        .load_and_count::<_, (i64, String)>(&conn)?;
+    let page_count = count / per_page + 1;
+
+    if  page > page_count {
+        invalid_page(ctx, msg).await?;
+        return Ok(())
+    }
 
     let board = wins.into_iter()
         .enumerate()
         .map(|(i, (score, id))| async move {
-            let position = match i + 1 {
+            let position = match i + 1 + ((page - 1) * per_page) as usize {
                 1 => "🥇".to_owned(),
                 2 => "🥈".to_owned(),
                 3 => "🥉".to_owned(),
@@ -208,7 +227,7 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 
     msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
-            e.title("👑 👑 👑 Scores 👑 👑 👑");
+            e.title(format!("👑 👑 👑 Scores ({}/{}) 👑 👑 👑", page, page_count));
             e.colour(Colour::GOLD);
             e.fields(board);
             e
