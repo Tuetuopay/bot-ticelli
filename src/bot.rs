@@ -77,64 +77,12 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guild)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let game = msg.game(&conn)?;
-    let game = match game {
-        Some((game, _)) => game,
-        None => return Ok(()),
-    };
 
-    let page = msg.content.split(' ').nth(1).map(|p| p.parse().ok()).flatten().unwrap_or(1);
-    let per_page = 10;
-
-    if page < 1 {
-        invalid_page(ctx, msg).await?;
-        return Ok(())
+    let res = crate::cmd::player::show(ctx, msg, conn).await;
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.send_message(&ctx.http, reply).await?;
     }
 
-    let (wins, count) = dsl::win.select((diesel::dsl::sql("count(win.id) as cnt"), dsl::winner_id))
-        .filter(dsl::reset.eq(false))
-        .inner_join(par_dsl::participation)
-        .filter(par_dsl::game_id.eq(&game.id))
-        .group_by(dsl::winner_id)
-        .order_by(diesel::dsl::sql::<diesel::sql_types::BigInt>("cnt").desc())
-        .paginate(page)
-        .per_page(per_page)
-        .load_and_count::<_, (i64, String)>(&conn)?;
-    let page_count = count / per_page + 1;
-
-    if  page > page_count {
-        invalid_page(ctx, msg).await?;
-        return Ok(())
-    }
-
-    let board = wins.into_iter()
-        .enumerate()
-        .map(|(i, (score, id))| async move {
-            let position = match i + 1 + ((page - 1) * per_page) as usize {
-                1 => "🥇".to_owned(),
-                2 => "🥈".to_owned(),
-                3 => "🥉".to_owned(),
-                p => p.to_string(),
-            };
-            let user_id = UserId(id.parse().unwrap());
-            match user_id.to_user(ctx.http.clone()).await {
-                Ok(user) => Ok((format!("{}. @{}", position, user.tag()), score.to_string(), false)),
-                Err(e) => Err(e),
-            }
-        });
-
-    let board = futures::future::join_all(board).await
-        .into_iter().collect::<Result<Vec<_>, _>>()?;
-
-    msg.channel_id.send_message(&ctx.http, |m| {
-        m.embed(|e| {
-            e.title(format!("👑 👑 👑 Scores ({}/{}) 👑 👑 👑", page, page_count));
-            e.colour(Colour::GOLD);
-            e.fields(board);
-            e
-        });
-        m
-    }).await?;
     Ok(())
 }
 
