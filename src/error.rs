@@ -18,6 +18,10 @@ pub enum Error {
     // Errors from handlers
     NoParticipant,
     NotYourTurn,
+    YouPostedNoPic,
+    StfuBot,
+    PicAlreadyPosted,
+    InvalidPage,
 }
 
 impl Display for Error {
@@ -35,8 +39,7 @@ impl StdError for Error {
         match self {
             Self::Db(e) => Some(e),
             Self::Serenity(e) => Some(e),
-            Self::NoParticipant => None,
-            Self::NotYourTurn => None,
+            _ => None,
         }
     }
 }
@@ -47,6 +50,10 @@ impl Error {
             Self::Db(_) | Self::Serenity(_) => Some("Erreur interne".to_owned()),
             Self::NoParticipant => Some("⁉️ Mais personne n'a la main ...".to_owned()),
             Self::NotYourTurn => Some("❌ Tut tut tut, c'est pas toi qui a la main...".to_owned()),
+            Self::YouPostedNoPic => Some("🤦 Hrmpf t'as pas mis de photo toi ...".to_owned()),
+            Self::StfuBot => Some("🤖 Tg le bot !".to_owned()),
+            Self::PicAlreadyPosted => Some("🦜 T'as déjà mis une photo coco.".to_owned()),
+            Self::InvalidPage => Some("Page invalide".to_owned()),
         }
     }
 }
