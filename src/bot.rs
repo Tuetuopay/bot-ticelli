@@ -58,93 +58,11 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guild)]
 async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
-        Some(_) => {
-            no_participant(ctx, msg).await?;
-            return Ok(())
-        }
-        None => return Ok(()),
-    };
 
-    // Check that participation is valid
-    if part.player_id != msg.author.id.to_string() {
-        not_your_turn(ctx, msg).await?;
-        return Ok(())
+    let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn));
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.say(&ctx.http, reply).await?;
     }
-    if part.picture_url.is_none() {
-        you_posted_no_pic(ctx, msg).await?;
-        return Ok(())
-    }
-
-    // Check that a single winner is mentioned
-    let winner = match msg.mentions.as_slice() {
-        [] => {
-            let content = MessageBuilder::new()
-                .mention(&msg.author)
-                .push(", cékiki le gagnant ?")
-                .build();
-            msg.channel_id.say(&ctx.http, content).await?;
-            return Ok(())
-        }
-        [winner] => winner,
-        [..] => {
-            msg.channel_id.say(&ctx.http, MessageBuilder::new()
-                .push("Hé ")
-                .mention(&msg.author)
-                .push(", tu serai pas un peu fada ? Un seul gagnant, un seul !")
-                .build()
-            ).await?;
-            return Ok(())
-        }
-    };
-
-    // Check that winner is valid (neither current participant nor a bot)
-    if winner.bot {
-        stfu_bot(ctx, msg).await?;
-        return Ok(())
-    }
-    if winner.id == msg.author.id {
-        let contents = MessageBuilder::new()
-            .mention(&msg.author)
-            .push(" be like https://i.imgflip.com/12w3f0.jpg")
-            .build();
-        msg.channel_id.say(&ctx.http, contents).await?;
-        return Ok(())
-    }
-
-    // Save the win
-    let win = NewWin {
-        player_id: &msg.author.id.0.to_string(),
-        winner_id: &winner.id.0.to_string(),
-    };
-    let win: Win = diesel::insert_into(dsl::win).values(win).get_result(&conn)?;
-    println!("Saved win {:?}", win);
-
-    // Mark participation as won
-    diesel::update(&part)
-        .set((par_dsl::is_win.eq(true),
-              par_dsl::won_at.eq(diesel::dsl::now),
-              par_dsl::win_id.eq(&win.id)))
-        .execute(&conn)?;
-
-    // Mark winner as new participant
-    let part = NewParticipation {
-        player_id: &win.winner_id,
-        picture_url: None,
-        game_id: &game.id,
-    };
-    diesel::insert_into(crate::schema::participation::table)
-        .values(part)
-        .get_result::<Participation>(&conn)?;
-
-    let content = MessageBuilder::new()
-        .push("Bravo ")
-        .mention(winner)
-        .push(", plus un dans votre pot à moutarde. A vous la main.")
-        .build();
-    msg.channel_id.say(&ctx.http, content).await?;
 
     Ok(())
 }
