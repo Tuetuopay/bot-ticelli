@@ -5,6 +5,8 @@
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
+use serenity::{model::id::ChannelId, http::client::Http};
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -49,5 +51,22 @@ impl From<diesel::result::Error> for Error {
 impl From<serenity::Error> for Error {
     fn from(e: serenity::Error) -> Error {
         Error::Serenity(e)
+    }
+}
+
+#[async_trait::async_trait]
+pub trait ErrorResultExt: Send {
+    async fn handle_err(self, chan: &ChannelId, http: &Http) -> Self;
+}
+
+#[async_trait::async_trait]
+impl<T: Send> ErrorResultExt for Result<T> {
+    async fn handle_err(self, chan: &ChannelId, http: &Http) -> Self {
+        if let Err(ref e) = self {
+            if let Some(s) = e.as_message() {
+                chan.say(http, s).await?;
+            }
+        }
+        self
     }
 }
