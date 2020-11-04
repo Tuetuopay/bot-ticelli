@@ -178,3 +178,30 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         m
     })))
 }
+
+pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMessageResult {
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => return Err(Error::NoParticipant),
+        None => return Ok(None),
+    };
+
+    let player = part.player();
+    let url = match part.picture_url {
+        Some(url) => url,
+        None => {
+            return Ok(Some(Box::new(move |m| m.content(MessageBuilder::new()
+                .push("C'est au tour de ")
+                .mention(&player)
+                .push(", mais il a pas posté de photo.")
+                .build()))))
+        }
+    };
+
+    let player = player.to_user(&ctx.http).await?;
+
+    Ok(Some(Box::new(move |m| {
+        m.embed(|e| e.author(|a| a.name(player.tag()).icon_url(player.face())).image(url))
+    })))
+}

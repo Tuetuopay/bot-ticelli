@@ -111,37 +111,11 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 #[only_in(guild)]
 async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
-        Some(_) => {
-            no_participant(ctx, msg).await?;
-            return Ok(())
-        }
-        None => return Ok(()),
-    };
 
-    let url = match part.picture_url {
-        Some(ref url) => url,
-        None => {
-            let content = MessageBuilder::new()
-                .push("C'est au tour de ")
-                .mention(&part.player())
-                .push(", mais il a pas posté de photo.")
-                .build();
-            msg.channel_id.say(&ctx.http, content).await?;
-            return Ok(())
-        }
-    };
-
-    let player = part.player().to_user(&ctx.http).await?;
-
-    msg.channel_id.send_message(&ctx.http, |m| {
-        m.embed(|e| {
-            e.author(|a| a.name(player.tag()).icon_url(player.face()))
-                .image(url)
-        })
-    }).await?;
+    let res = crate::cmd::player::pic(ctx, msg, conn).await;
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.send_message(&ctx.http, reply).await?;
+    }
 
     Ok(())
 }
