@@ -11,8 +11,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    // Lib errors
     Db(diesel::result::Error),
     Serenity(serenity::Error),
+
+    // Errors from handlers
+    NoParticipant,
+    NotYourTurn,
 }
 
 impl Display for Error {
@@ -30,6 +35,8 @@ impl StdError for Error {
         match self {
             Self::Db(e) => Some(e),
             Self::Serenity(e) => Some(e),
+            Self::NoParticipant => None,
+            Self::NotYourTurn => None,
         }
     }
 }
@@ -38,6 +45,8 @@ impl Error {
     pub fn as_message(&self) -> Option<String> {
         match self {
             Self::Db(_) | Self::Serenity(_) => Some("Erreur interne".to_owned()),
+            Self::NoParticipant => Some("⁉️ Mais personne n'a la main ...".to_owned()),
+            Self::NotYourTurn => Some("❌ Tut tut tut, c'est pas toi qui a la main...".to_owned()),
         }
     }
 }

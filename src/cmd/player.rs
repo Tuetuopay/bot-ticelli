@@ -8,36 +8,31 @@ use serenity::{
     utils::{Colour, MessageBuilder},
 };
 
+use crate::error::{Error, Result};
 use crate::extensions::MessageExt;
 use crate::messages::*;
 use crate::PgPooledConn;
 
-type Result = crate::error::Result<()>;
+type StringResult = Result<Option<String>>;
 
-pub async fn skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> Result {
+pub async fn skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
 
     let (game, part) = match game {
         Some((game, Some(part))) => (game, part),
-        Some(_) => {
-            no_participant(ctx, msg).await?;
-            return Ok(())
-        }
-        None => return Ok(()),
+        Some(_) => return Err(Error::NoParticipant),
+        None => return Ok(None),
     };
 
     if part.player_id != msg.author.id.to_string() {
-        not_your_turn(ctx, msg).await?;
-        return Ok(())
+        return Err(Error::NotYourTurn)
     }
 
     part.skip(conn)?;
 
-    let content = MessageBuilder::new()
+    Ok(Some(MessageBuilder::new()
         .push("A vos photos, ")
         .mention(&msg.author)
         .push(" passe la main !")
-        .build();
-    msg.channel_id.say(&ctx.http, content).await?;
-    Ok(())
+        .build()))
 }

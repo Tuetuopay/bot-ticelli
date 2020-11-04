@@ -42,7 +42,10 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::player::skip(ctx, msg, &conn));
-    res.handle_err(&msg.channel_id, &ctx.http).await?;
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.say(&ctx.http, reply).await?;
+    }
+
     Ok(())
 }
 
