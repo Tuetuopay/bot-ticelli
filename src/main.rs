@@ -8,7 +8,9 @@ use serenity::prelude::*;
 use serenity::framework::StandardFramework;
 
 mod bot;
+mod cmd;
 mod config;
+mod error;
 mod extensions;
 mod messages;
 mod models;
