@@ -95,77 +95,10 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 #[required_permissions(ADMINISTRATOR)]
 async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some((game, part)) => (game, part),
-        None => return Ok(()),
-    };
 
-    match msg.content.split(' ').collect::<Vec<_>>().as_slice() {
-        [_, "do"] => {
-            let reset_id = Uuid::new_v4();
-            let win_ids = par_dsl::participation
-                .filter(par_dsl::is_win.eq(true))
-                .filter(par_dsl::game_id.eq(&game.id))
-                .select(par_dsl::win_id)
-                .load::<Option<Uuid>>(&conn)?
-                .into_iter()
-                .filter_map(|id| id)
-                .collect::<Vec<_>>();
-            diesel::update(
-                dsl::win
-                    .filter(dsl::reset.eq(false))
-                    .filter(dsl::id.eq(diesel::dsl::any(win_ids))))
-                .set((dsl::reset.eq(true),
-                      dsl::reset_at.eq(diesel::dsl::now),
-                      dsl::reset_id.eq(reset_id)))
-                .execute(&conn)?;
-
-            // Mark the current participation as skipped (if any)
-            if let Some(part) = part {
-                part.skip(&conn)?;
-            }
-
-            msg.channel_id.say(&ctx.http, format!("Scores reset avec ID {}", reset_id)).await?;
-        }
-        [_, "list"] => {
-            use diesel::sql_types::Timestamptz;
-            let resets = dsl::win
-                .select((dsl::reset_id, diesel::dsl::sql::<Timestamptz>("max(reset_at) as rst")))
-                .inner_join(par_dsl::participation)
-                .filter(par_dsl::game_id.eq(&game.id))
-                .filter(dsl::reset.eq(true))
-                .filter(diesel::dsl::sql("true group by reset_id"))
-                .order_by(diesel::dsl::sql::<Timestamptz>("rst"))
-                .load::<(Option<Uuid>, DateTime<Utc>)>(&conn)?
-                .into_iter()
-                .enumerate()
-                .filter_map(|(i, (id, at))| match id {
-                    Some(id) => Some(format!("{}. {} à {}", i + 1, id, at)),
-                    _ => None,
-                })
-                .join("\n");
-            msg.channel_id.say(&ctx.http, format!("Resets:\n{}", resets)).await?;
-        }
-        [_, "cancel", id] => {
-            let reset_id: Uuid = match id.parse() {
-                Ok(id) => id,
-                Err(_) => {
-                    msg.channel_id.say(&ctx.http, "ID de reset invalide").await?;
-                    return Ok(())
-                }
-            };
-            diesel::update(dsl::win.filter(dsl::reset.eq(true)).filter(dsl::reset_id.eq(reset_id)))
-                .set((dsl::reset.eq(false),
-                      dsl::reset_at.eq::<Option<DateTime<Utc>>>(None),
-                      dsl::reset_id.eq::<Option<Uuid>>(None)))
-                .execute(&conn)?;
-
-            msg.channel_id.say(&ctx.http, format!("Reset {} annulé", reset_id)).await?;
-        }
-        [..] => {
-            msg.channel_id.say(&ctx.http, "Arguments inconnus.").await?;
-        }
+    let res = conn.async_transaction(crate::cmd::admin::reset(ctx, msg, &conn));
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.say(&ctx.http, reply).await?;
     }
 
     Ok(())

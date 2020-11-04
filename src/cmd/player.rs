@@ -16,12 +16,7 @@ use crate::messages::*;
 use crate::models::*;
 use crate::paginate::*;
 use crate::PgPooledConn;
-
-type StringResult = Result<Option<String>>;
-type CreateMessageClosure = Box<
-    dyn for <'a, 'b> FnOnce(&'b mut CreateMessage<'a>) -> &'b mut CreateMessage<'a> + Send
->;
-type CreateMessageResult = Result<Option<CreateMessageClosure>>;
+use super::*;
 
 pub async fn skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;

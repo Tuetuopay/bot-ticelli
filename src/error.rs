@@ -22,6 +22,8 @@ pub enum Error {
     StfuBot,
     PicAlreadyPosted,
     InvalidPage,
+    InvalidResetId,
+    UnknownArguments,
 }
 
 impl Display for Error {
@@ -54,6 +56,8 @@ impl Error {
             Self::StfuBot => Some("🤖 Tg le bot !".to_owned()),
             Self::PicAlreadyPosted => Some("🦜 T'as déjà mis une photo coco.".to_owned()),
             Self::InvalidPage => Some("Page invalide".to_owned()),
+            Self::InvalidResetId => Some("ID de reset invalide".to_owned()),
+            Self::UnknownArguments => Some("Arguments inconnus".to_owned()),
         }
     }
 }
