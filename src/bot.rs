@@ -23,7 +23,7 @@ use serenity::{
 use uuid::Uuid;
 
 use crate::PgPool;
-use crate::extensions::MessageExt;
+use crate::extensions::{ConnectionExt, MessageExt};
 use crate::messages::*;
 use crate::models::*;
 use crate::paginate::*;
@@ -40,22 +40,13 @@ impl EventHandler for Bot {}
 async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    tokio::task::block_in_place(|| {
-        conn.build_transaction().serializable().run(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let res = crate::cmd::player::skip(ctx, msg, &conn).await;
-                match res {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        if let Some(s) = e.as_message() {
-                            msg.channel_id.say(&ctx.http, s).await?;
-                        }
-                        Ok(())
-                    }
-                }
-            })
-        })
-    })
+    let res = conn.async_transaction(crate::cmd::player::skip(ctx, msg, &conn));
+    if let Err(e) = res {
+        if let Some(s) = e.as_message() {
+            msg.channel_id.say(&ctx.http, s).await?;
+        }
+    }
+    Ok(())
 }
 
 #[command("win")]
