@@ -4,19 +4,17 @@
 
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl, OptionalExtension};
+use diesel::prelude::{ExpressionMethods, QueryDsl, RunQueryDsl, OptionalExtension};
 use serenity::{
-    builder::CreateMessage,
     client::Context,
-    model::prelude::{Message, UserId},
-    utils::{Colour, MessageBuilder},
+    model::prelude::Message,
+    utils::MessageBuilder,
 };
 use uuid::Uuid;
 
-use crate::error::{Error, Result};
+use crate::error::Error;
 use crate::extensions::MessageExt;
 use crate::models::*;
-use crate::paginate::*;
 use crate::PgPooledConn;
 use super::*;
 

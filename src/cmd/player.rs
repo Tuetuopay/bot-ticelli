@@ -4,15 +4,13 @@
 
 use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl};
 use serenity::{
-    builder::CreateMessage,
     client::Context,
     model::prelude::{Message, UserId},
     utils::{Colour, MessageBuilder},
 };
 
-use crate::error::{Error, Result};
+use crate::error::Error;
 use crate::extensions::MessageExt;
-use crate::messages::*;
 use crate::models::*;
 use crate::paginate::*;
 use crate::PgPooledConn;

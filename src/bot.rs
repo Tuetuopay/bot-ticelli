@@ -4,9 +4,7 @@
 
 use std::collections::HashSet;
 
-use chrono::{DateTime, Utc};
-use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl};
-use itertools::Itertools;
+use diesel::prelude::{ExpressionMethods, RunQueryDsl};
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
@@ -18,16 +16,13 @@ use serenity::{
         macros::{command, group, hook, help},
     },
     model::prelude::{Message, UserId},
-    utils::{Colour, MessageBuilder},
 };
-use uuid::Uuid;
 
 use crate::PgPool;
 use crate::error::ErrorResultExt;
 use crate::extensions::{ConnectionExt, MessageExt};
 use crate::messages::*;
 use crate::models::*;
-use crate::paginate::*;
 
 pub struct Bot;
 
