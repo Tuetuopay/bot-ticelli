@@ -87,3 +87,20 @@ pub async fn reset(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringR
         [..] => Err(Error::UnknownArguments),
     }
 }
+
+pub async fn force_skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+    let game = msg.game(&conn)?;
+    let (game, part) = match game {
+        Some((game, Some(part))) => (game, part),
+        Some(_) => return Err(Error::NoParticipant),
+        None => return Ok(None),
+    };
+
+    part.skip(&conn)?;
+
+    Ok(Some(MessageBuilder::new()
+        .push("A vos photos, ")
+        .mention(&part.player())
+        .push(" n'a plus la main, on y a coupé court !")
+        .build()))
+}
