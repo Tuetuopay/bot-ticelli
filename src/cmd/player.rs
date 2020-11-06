@@ -192,7 +192,7 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
             return Ok(Some(Box::new(move |m| m.content(MessageBuilder::new()
                 .push("C'est au tour de ")
                 .mention(&player)
-                .push(", mais il a pas posté de photo.")
+                .push(" qui n'a pas encore posté de photo.")
                 .build()))))
         }
     };
