@@ -48,7 +48,8 @@ async fn main() {
         .configure(|c| c.allow_dm(false).prefix("!"))
         .group(&bot::GENERAL_GROUP)
         .help(&bot::CMD_HELP)
-        .normal_message(bot::on_message);
+        .normal_message(bot::on_message)
+        .before(bot::filter_command);
 
     let mut client = Client::builder(&config.auth.token)
         .event_handler(Bot)

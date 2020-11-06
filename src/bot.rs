@@ -28,6 +28,11 @@ pub struct Bot;
 
 impl EventHandler for Bot {}
 
+#[hook]
+pub async fn filter_command(_: &Context, msg: &Message, _: &str) -> bool {
+    msg.attachments.len() == 0
+}
+
 #[command("skip")]
 #[description("Passer son tour.")]
 #[num_args(0)]
