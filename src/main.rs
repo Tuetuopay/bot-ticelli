@@ -45,7 +45,7 @@ async fn main() {
     // Create client instance
     println!("Connecting to discord...");
     let framework = StandardFramework::new()
-        .configure(|c| c.allow_dm(false).prefix("!"))
+        .configure(|c| c.allow_dm(false).prefix(&config.bot_config.command_prefix))
         .group(&bot::GENERAL_GROUP)
         .help(&bot::CMD_HELP)
         .normal_message(bot::on_message)
