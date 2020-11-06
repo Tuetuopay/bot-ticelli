@@ -15,13 +15,13 @@ use serenity::{
         help_commands,
         macros::{command, group, hook, help},
     },
-    model::prelude::{Message, UserId},
+    model::prelude::{Attachment, Message, UserId},
 };
 
-use crate::PgPool;
-use crate::error::ErrorResultExt;
+use crate::{PgPool, PgPooledConn};
+use crate::cmd::StringResult;
+use crate::error::{Error, ErrorResultExt};
 use crate::extensions::{ConnectionExt, MessageExt};
-use crate::messages::*;
 use crate::models::*;
 
 pub struct Bot;
@@ -158,39 +158,54 @@ pub struct General;
 pub async fn on_message(ctx: &Context, msg: &Message) {
     tokio::spawn(log_message(ctx.clone(), msg.clone()));
 
-    if let Err(e) = _on_message(ctx, msg).await {
-        println!("Failed to handle message: {}", e);
-    }
-}
-
-async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::error::Error>> {
     // Find picture attachment
     let attachment = match msg.attachments.iter().filter(|a| a.height.is_some()).next() {
         Some(att) => att,
-        None => return Ok(()),
+        None => return,
     };
 
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
-    let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some(s) => s,
-        None => return Ok(()),
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get();
+    let conn = match conn {
+        Ok(conn) => conn,
+        Err(_e) => {
+            // TODO raise to sentry
+            msg.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
+            return
+        }
     };
+
+    let res = tokio::task::block_in_place(||
+        conn.build_transaction().serializable().run(||
+            on_participation(&ctx, &msg, &conn, attachment)));
+
+    if let Ok(Some(reply)) = res.handle_err(&msg.channel_id, &ctx.http).await {
+        msg.channel_id.say(&ctx.http, reply).await.expect("Failed to send message");
+    }
+}
+
+fn on_participation(
+    ctx: &Context,
+    msg: &Message,
+    conn: &PgPooledConn,
+    attachment: &Attachment
+) -> StringResult {
+    // Find game itself
+    let game = msg.game(conn)?;
+    let (game, part) = match game { Some(s) => s, None => return Ok(None) };
 
     let part: Participation = if let Some(part) = part {
         // Check the participant
         if part.player_id != msg.author.id.to_string() {
             // Don't send any error message as this is annoying when people post guess pics etc
-            return Ok(())
+            return Ok(None)
         }
 
         if part.picture_url.is_none() {
             diesel::update(&part)
                 .set(par_dsl::picture_url.eq(&attachment.proxy_url))
-                .get_result(&conn)?
+                .get_result(conn)?
         } else {
-            pic_already_posted(ctx, msg).await?;
-            return Ok(())
+            return Err(Error::PicAlreadyPosted)
         }
     } else {
         // Create the participation itself as nobody has a hand
@@ -201,14 +216,12 @@ async fn _on_message(ctx: &Context, msg: &Message) -> Result<(), Box<dyn std::er
         };
         diesel::insert_into(crate::schema::participation::table)
             .values(part)
-            .get_result(&conn)?
+            .get_result(conn)?
     };
 
     println!("Saved participation {:?}", part);
 
-    new_pic_available(ctx, msg).await?;
-
-    return Ok(())
+    return Ok(Some("🔎 À vos claviers, une nouvelle photo est à trouver".to_owned()))
 }
 
 async fn log_message(ctx: Context, msg: Message) {

@@ -12,7 +12,6 @@ mod cmd;
 mod config;
 mod error;
 mod extensions;
-mod messages;
 mod models;
 mod paginate;
 mod schema;
