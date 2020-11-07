@@ -29,7 +29,7 @@ async fn main() {
     let matches = clap_app!(bot =>
         (version: env!("CARGO_PKG_VERSION"))
         (author: env!("CARGO_PKG_AUTHORS"))
-        (@arg CONFIG: -c --config "Config file path. Defaults to config.toml")
+        (@arg CONFIG: -c --config +takes_value "Config file path. Defaults to config.toml")
     ).get_matches();
 
     let config = matches.value_of("CONFIG").unwrap_or("config.toml");

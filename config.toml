@@ -3,3 +3,6 @@ token = "youmadbro"
 
 [db-config]
 database-url = "postgres://bot:bot@localhost:5432/bot"
+
+[bot-config]
+command-prefix = "!"
