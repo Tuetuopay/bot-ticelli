@@ -121,6 +121,7 @@ pub async fn start(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringR
         creator_id: &msg.author.id.to_string(),
     };
     let game: Game = diesel::insert_into(game_dsl::game).values(game).get_result(conn)?;
+    println!("Created new game: {:?}", game);
 
-    Ok(Some(format!("Partie {} démarrée !", game.id)))
+    Ok(Some(format!("Partie démarrée !")))
 }
