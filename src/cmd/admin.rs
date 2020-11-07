@@ -102,3 +102,25 @@ pub async fn force_skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> St
         .push(" n'a plus la main, on y a coupé court !")
         .build()))
 }
+
+pub async fn start(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+    let game = msg.game(conn)?;
+
+    if game.is_some() {
+        return Ok(Some(format!("Il y a déjà une partie en cours dans ce chan")))
+    }
+
+    let guild = match msg.guild_id {
+        Some(guild) => guild,
+        None => return Ok(None),
+    };
+
+    let game = NewGame {
+        guild_id: &guild.to_string(),
+        channel_id: &msg.channel_id.to_string(),
+        creator_id: &msg.author.id.to_string(),
+    };
+    let game: Game = diesel::insert_into(game_dsl::game).values(game).get_result(conn)?;
+
+    Ok(Some(format!("Partie {} démarrée !", game.id)))
+}

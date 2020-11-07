@@ -136,6 +136,22 @@ async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command("start")]
+#[description("Démarre une nouvelle partie")]
+#[num_args(0)]
+#[only_in(guild)]
+#[required_permissions(ADMINISTRATOR)]
+async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+
+    let res = conn.async_transaction(crate::cmd::admin::start(ctx, msg, &conn));
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.say(&ctx.http, reply).await?;
+    }
+
+    Ok(())
+}
+
 #[help]
 #[no_help_available_text("Commande inexistante")]
 #[usage_sample_label("Exemple")]
@@ -156,7 +172,7 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start)]
 pub struct General;
 
 #[hook]
