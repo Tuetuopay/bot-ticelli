@@ -39,3 +39,4 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: target/release/bot-ticelli
         asset_name: bot-ticelli
+        asset_content_type: application/octet-stream
