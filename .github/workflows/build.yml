@@ -9,6 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
     - uses: actions/cache@v2
       with:
         path: |
@@ -16,10 +17,9 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --release
+      run: cargo build
     - uses: actions/upload-artifact@v2
       with:
         name: bot-ticelli
-        path: target/release/bot-ticelli
+        path: target/debug/bot-ticelli
