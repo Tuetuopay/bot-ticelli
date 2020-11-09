@@ -59,7 +59,7 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn));
+    let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn, false));
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -152,6 +152,22 @@ async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command("force_win")]
+#[description("Force une victoire d'un joueur")]
+#[num_args(1)]
+#[only_in(guild)]
+#[required_permissions(ADMINISTRATOR)]
+async fn cmd_force_win(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+
+    let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn, true));
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.say(&ctx.http, reply).await?;
+    }
+
+    Ok(())
+}
+
 #[help]
 #[no_help_available_text("Commande inexistante")]
 #[usage_sample_label("Exemple")]
@@ -172,7 +188,7 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start, cmd_force_win)]
 pub struct General;
 
 #[hook]

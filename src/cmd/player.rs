@@ -38,7 +38,7 @@ pub async fn skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringRe
         .build()))
 }
 
-pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool) -> StringResult {
     let game = msg.game(conn)?;
     let (game, part) = match game {
         Some((game, Some(part))) => (game, part),
@@ -47,8 +47,10 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringRes
     };
 
     // Check that participation is valid
-    if part.player_id != msg.author.id.to_string() {
-        return Err(Error::NotYourTurn)
+    if !force {
+        if part.player_id != msg.author.id.to_string() {
+            return Err(Error::NotYourTurn)
+        }
     }
     if part.picture_url.is_none() {
         return Err(Error::YouPostedNoPic)
