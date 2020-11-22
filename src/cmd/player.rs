@@ -174,8 +174,11 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                 p => p.to_string(),
             };
             let user_id = UserId(id.parse().unwrap());
-            match user_id.to_user(ctx.http.clone()).await {
-                Ok(user) => Ok((format!("{}. @{}", position, user.tag()), score.to_string(), false)),
+            match user_id.to_user(&ctx.http).await {
+                Ok(user) => {
+                    let nick = user.nick_in(&ctx.http, msg.guild_id.unwrap()).await;
+                    Ok((format!("{}. {}", position, nick.unwrap_or(user.name)), score, false))
+                }
                 Err(e) => Err(e),
             }
         });
