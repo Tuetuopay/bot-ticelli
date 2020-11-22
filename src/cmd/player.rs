@@ -218,8 +218,10 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
     };
 
     let player = player.to_user(&ctx.http).await?;
+    let nick = player.nick_in(&ctx.http, msg.guild_id.unwrap()).await
+        .unwrap_or(player.name.clone());
 
-    Ok(Some(Box::new(move |m| {
-        m.embed(|e| e.author(|a| a.name(player.tag()).icon_url(player.face())).image(url))
-    })))
+    Ok(Some(Box::new(move |m|
+        m.embed(|e| e.author(|a| a.name(nick).icon_url(player.face())).image(url))
+    )))
 }
