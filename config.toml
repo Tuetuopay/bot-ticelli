@@ -10,3 +10,4 @@ win-sentences = [
     "Bravo {}, plus un dans votre pot à moutarde. A vous la main.",
     "GG {}, un point pour Gryffondor !",
 ]
+ratelimit = { delay = 5, time-span = 30, limit = 4 }

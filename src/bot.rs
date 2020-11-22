@@ -75,6 +75,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 #[example("1")]
 #[help_available]
 #[only_in(guild)]
+#[bucket(command_limiter)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
@@ -109,6 +110,7 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 #[help_available]
 #[only_in(guild)]
+#[bucket(command_limiter)]
 async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 

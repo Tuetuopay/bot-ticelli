@@ -49,12 +49,21 @@ async fn main() {
 
     // Create client instance
     println!("Connecting to discord...");
-    let framework = StandardFramework::new()
+    let mut framework = StandardFramework::new()
         .configure(|c| c.allow_dm(false).prefix(&config.bot_config.command_prefix))
         .group(&bot::GENERAL_GROUP)
         .help(&bot::CMD_HELP)
         .normal_message(bot::on_message)
         .before(bot::filter_command);
+
+    if let Some(rl) = config.bot_config.ratelimit {
+        framework = framework.bucket("command_limiter", |b| {
+            if let Some(delay) = rl.delay { b.delay(delay); }
+            if let Some(time_span) = rl.time_span { b.time_span(time_span); }
+            if let Some(limit) = rl.limit { b.limit(limit); }
+            b
+        }).await;
+    }
 
     let mut client = Client::builder(&config.auth.token)
         .event_handler(Bot)
