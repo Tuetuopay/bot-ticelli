@@ -3,6 +3,7 @@
  */
 
 use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl};
+use rand::seq::SliceRandom;
 use serenity::{
     client::Context,
     model::prelude::{Message, UserId},
@@ -113,10 +114,24 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
         .values(part)
         .get_result::<Participation>(conn)?;
 
+    let def = vec![];
+    let data = ctx.data.read().await;
+    let sentence = data.get::<crate::WinSentences>()
+        .unwrap_or(&def)
+        .choose(&mut rand::thread_rng())
+        .map(String::as_str)
+        .unwrap_or("Bravo {}, à vous la main.")
+        .split("{}")
+        .collect::<Vec<_>>();
+    let (left, right) = match sentence.as_slice() {
+        [l, r, ..] => (*l, *r),
+        _ => ("Bravo ", ", à vous la main."),
+    };
+
     Ok(Some(MessageBuilder::new()
-        .push("Bravo ")
+        .push(left)
         .mention(winner)
-        .push(", plus un dans votre pot à moutarde. A vous la main.")
+        .push(right)
         .build()))
 }
 

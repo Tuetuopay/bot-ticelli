@@ -103,6 +103,7 @@ dependencies = [
  "diesel",
  "futures",
  "itertools",
+ "rand",
  "serde",
  "serde_derive",
  "serenity",

@@ -24,6 +24,11 @@ impl TypeMapKey for PgPool {
 }
 pub type PgPooledConn = PooledConnection<ConnectionManager<PgConnection>>;
 
+struct WinSentences;
+impl TypeMapKey for WinSentences {
+    type Value = Vec<String>;
+}
+
 #[tokio::main]
 async fn main() {
     let matches = clap_app!(bot =>
@@ -57,6 +62,7 @@ async fn main() {
         .await
         .expect("Failed to create discord client");
     client.data.write().await.insert::<PgPool>(pool);
+    client.data.write().await.insert::<WinSentences>(config.bot_config.win_sentences);
 
     println!("Runing app...");
     client.start().await.expect("Client error")

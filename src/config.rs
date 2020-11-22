@@ -30,6 +30,9 @@ pub struct DbConfig {
 pub struct BotConfig {
     /// Discord command prefix
     pub command_prefix: String,
+
+    /// Sentences to use on win
+    pub win_sentences: Vec<String>,
 }
 
 pub fn load_config(path: &str) -> Result<Config, Box<dyn std::error::Error>> {
