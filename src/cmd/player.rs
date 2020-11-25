@@ -17,11 +17,11 @@ use crate::paginate::*;
 use crate::PgPooledConn;
 use super::*;
 
-pub async fn skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+pub async fn skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
 
-    let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
+    let part = match game {
+        Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
         None => return Ok(None),
     };
@@ -199,8 +199,8 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
 
 pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMessageResult {
     let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
+    let part = match game {
+        Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
         None => return Ok(None),
     };

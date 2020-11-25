@@ -18,7 +18,7 @@ use crate::models::*;
 use crate::PgPooledConn;
 use super::*;
 
-pub async fn reset(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
     let (game, part) = match game {
         Some((game, part)) => (game, part),
@@ -86,10 +86,10 @@ pub async fn reset(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringR
     }
 }
 
-pub async fn force_skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+pub async fn force_skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(&conn)?;
-    let (game, part) = match game {
-        Some((game, Some(part))) => (game, part),
+    let part = match game {
+        Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
         None => return Ok(None),
     };
@@ -103,7 +103,7 @@ pub async fn force_skip(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> St
         .build()))
 }
 
-pub async fn start(ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
+pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
 
     if game.is_some() {

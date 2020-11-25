@@ -223,7 +223,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 }
 
 fn on_participation(
-    ctx: &Context,
+    _ctx: &Context,
     msg: &Message,
     conn: &PgPooledConn,
     attachment: &Attachment
