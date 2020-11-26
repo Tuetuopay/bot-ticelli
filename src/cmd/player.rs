@@ -164,6 +164,18 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         return Err(Error::InvalidPage)
     }
 
+    if let Some((_, first)) = wins.first() {
+        let first = UserId(first.parse().unwrap());
+        if first == msg.author.id {
+            return Ok(Some(Box::new(move |m|
+                m.content(MessageBuilder::new()
+                    .push("Mais oui mais oui ")
+                    .mention(&first)
+                    .push(", tu es toujours premier ..."))
+            )))
+        }
+    }
+
     let board = wins.into_iter()
         .enumerate()
         .map(|(i, (score, id))| async move {
