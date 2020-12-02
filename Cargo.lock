@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "bot-ticelli"
-version = "1.1.2"
+version = "1.2.0"
 dependencies = [
  "async-trait",
  "barrel",
