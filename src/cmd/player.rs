@@ -237,3 +237,21 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
         m.embed(|e| e.author(|a| a.name(nick).icon_url(player.face())).image(url))
     )))
 }
+
+pub async fn change(_ctx: &Context, msg: &Message, conn: PgPooledConn) -> StringResult {
+    let game = msg.game(&conn)?;
+
+    let part = match game {
+        Some((_, Some(part))) => part,
+        Some(_) => return Err(Error::NoParticipant),
+        None => return Ok(None),
+    };
+
+    if part.player_id != msg.author.id.to_string() {
+        return Err(Error::NotYourTurn)
+    }
+
+    diesel::update(&part).set(par_dsl::picture_url.eq(Option::<String>::None)).execute(&conn)?;
+
+    Ok(Some("Ok, ok, puisque t'insistes ...".to_owned()))
+}

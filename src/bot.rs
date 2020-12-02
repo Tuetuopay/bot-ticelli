@@ -122,6 +122,21 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[command("change")]
+#[description("Changer de photo, pour les indécis")]
+#[num_args(0)]
+#[only_in(guild)]
+async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult {
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+
+    let res = crate::cmd::player::change(ctx, msg, conn).await;
+    if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
+        msg.channel_id.say(&ctx.http, reply).await?;
+    }
+
+    Ok(())
+}
+
 #[command("force_skip")]
 #[description("Force la main à passer")]
 #[num_args(0)]
@@ -190,7 +205,7 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start, cmd_force_win)]
+#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start, cmd_force_win, cmd_change)]
 pub struct General;
 
 #[hook]
