@@ -4,8 +4,10 @@ extern crate clap;
 extern crate diesel;
 
 use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
+use opentelemetry::KeyValue;
 use serenity::prelude::*;
 use serenity::framework::StandardFramework;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
 
 mod bot;
 mod cmd;
@@ -42,13 +44,34 @@ async fn main() {
         .map_err(|e| format!("Failed to load {}: {}", config, e))
         .unwrap();
 
+    // Install tracing framework with Jaeger sink
+    let _guard = if let Some(ref tracing) = config.tracing_config {
+        if let Some(ref jaeger) = tracing.jaeger {
+            let (tracer, uninstall) = opentelemetry_jaeger::new_pipeline()
+                .with_agent_endpoint(jaeger)
+                .with_service_name("bot-ticelli")
+                .with_tags(vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))])
+                .install()
+                .expect("Failed to install jaeger tracing");
+            let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+            let subscriber = tracing_subscriber::Registry::default()
+                .with(tracing_subscriber::fmt::layer())
+                .with(EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new("debug")))
+                .with(telemetry);
+            tracing::subscriber::set_global_default(subscriber).expect("Failed to install tracing");
+            tracing::info!("Installed jaeger tracing");
+
+            Some(uninstall)
+        } else { None }
+    } else { None };
+
     // Connect to database
-    println!("Connecting to postgres...");
+    tracing::info!("Connecting to postgres...");
     let manager = ConnectionManager::<PgConnection>::new(&config.db_config.database_url);
     let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
 
     // Create client instance
-    println!("Connecting to discord...");
+    tracing::info!("Connecting to discord...");
     let mut framework = StandardFramework::new()
         .configure(|c| c.allow_dm(false).prefix(&config.bot_config.command_prefix))
         .group(&bot::GENERAL_GROUP)
@@ -73,6 +96,6 @@ async fn main() {
     client.data.write().await.insert::<PgPool>(pool);
     client.data.write().await.insert::<WinSentences>(config.bot_config.win_sentences);
 
-    println!("Runing app...");
+    tracing::info!("Runing app...");
     client.start().await.expect("Client error")
 }

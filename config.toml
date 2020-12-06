@@ -11,3 +11,6 @@ win-sentences = [
     "GG {}, un point pour Gryffondor !",
 ]
 ratelimit = { delay = 5, time-span = 30, limit = 4 }
+
+[tracing-config]
+jaeger = "localhost:6831"

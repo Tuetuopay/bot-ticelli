@@ -10,6 +10,7 @@ pub struct Config {
     pub auth: AuthConfig,
     pub db_config: DbConfig,
     pub bot_config: BotConfig,
+    pub tracing_config: Option<TracingConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,6 +50,15 @@ pub struct RatelimitConfig {
 
     /// Number of invocations allowed per `time_span`
     pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct TracingConfig {
+    /// Where to send opentelemetry data, in Jaeger format. `<ip|hostname>:<port>`.
+    pub jaeger: Option<String>,
+
+    // TODO sentry, prometheus
 }
 
 pub fn load_config(path: &str) -> Result<Config, Box<dyn std::error::Error>> {
