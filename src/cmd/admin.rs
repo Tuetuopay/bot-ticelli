@@ -18,6 +18,7 @@ use crate::models::*;
 use crate::PgPooledConn;
 use super::*;
 
+#[tracing::instrument(skip(_ctx, msg, conn))]
 pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
     let (game, part) = match game {
@@ -86,6 +87,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
     }
 }
 
+#[tracing::instrument(skip(_ctx, msg, conn))]
 pub async fn force_skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(&conn)?;
     let part = match game {
@@ -103,6 +105,7 @@ pub async fn force_skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> S
         .build()))
 }
 
+#[tracing::instrument(skip(_ctx, msg, conn))]
 pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
 

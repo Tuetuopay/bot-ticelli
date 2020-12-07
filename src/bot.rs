@@ -17,6 +17,7 @@ use serenity::{
     },
     model::prelude::{Attachment, Message, UserId},
 };
+use tracing::{Instrument, instrument};
 
 use crate::{PgPool, PgPooledConn};
 use crate::cmd::StringResult;
@@ -33,6 +34,7 @@ pub async fn filter_command(_: &Context, msg: &Message, _: &str) -> bool {
     msg.attachments.len() == 0
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("skip")]
 #[description("Passer son tour.")]
 #[num_args(0)]
@@ -49,6 +51,7 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("win")]
 #[description("Marquer un joueur comme gagnant")]
 #[usage("<joueur>")]
@@ -67,6 +70,7 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("show")]
 #[description("Afficher le scoreboard")]
 #[min_args(0)]
@@ -79,7 +83,9 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let res = crate::cmd::player::show(ctx, msg, conn).await;
+    let res = crate::cmd::player::show(ctx, msg, conn)
+        .instrument(tracing::info_span!("show"))
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.send_message(&ctx.http, reply).await?;
     }
@@ -87,6 +93,7 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("reset")]
 #[description("Gère le reset des scores")]
 #[usage("[do|list|cancel <id>]")]
@@ -105,6 +112,7 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("pic")]
 #[description("Affiche l'image à deviner")]
 #[num_args(0)]
@@ -114,7 +122,9 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let res = crate::cmd::player::pic(ctx, msg, conn).await;
+    let res = crate::cmd::player::pic(ctx, msg, conn)
+        .instrument(tracing::info_span!("pic"))
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.send_message(&ctx.http, reply).await?;
     }
@@ -122,6 +132,7 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("change")]
 #[description("Changer de photo, pour les indécis")]
 #[num_args(0)]
@@ -137,6 +148,7 @@ async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("force_skip")]
 #[description("Force la main à passer")]
 #[num_args(0)]
@@ -153,6 +165,7 @@ async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("start")]
 #[description("Démarre une nouvelle partie")]
 #[num_args(0)]
@@ -169,6 +182,7 @@ async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[command("force_win")]
 #[description("Force une victoire d'un joueur")]
 #[num_args(1)]
@@ -185,6 +199,7 @@ async fn cmd_force_win(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+#[instrument(skip(ctx, msg))]
 #[help]
 #[no_help_available_text("Commande inexistante")]
 #[usage_sample_label("Exemple")]
@@ -208,6 +223,7 @@ async fn cmd_help(
 #[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start, cmd_force_win, cmd_change)]
 pub struct General;
 
+#[instrument(skip(ctx, msg))]
 #[hook]
 pub async fn on_message(ctx: &Context, msg: &Message) {
     tokio::spawn(log_message(ctx.clone(), msg.clone()));
@@ -237,6 +253,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     }
 }
 
+#[instrument(skip(_ctx, msg, conn, attachment))]
 fn on_participation(
     _ctx: &Context,
     msg: &Message,

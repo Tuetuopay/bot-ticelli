@@ -9,6 +9,7 @@ use serenity::{
     model::prelude::{Message, UserId},
     utils::{Colour, MessageBuilder},
 };
+use tracing::{info_span, instrument, Instrument};
 
 use crate::error::Error;
 use crate::extensions::MessageExt;
@@ -17,6 +18,7 @@ use crate::paginate::*;
 use crate::PgPooledConn;
 use super::*;
 
+#[instrument(skip(_ctx, msg, conn))]
 pub async fn skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
     let game = msg.game(conn)?;
 
@@ -39,6 +41,7 @@ pub async fn skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringR
         .build()))
 }
 
+#[instrument(skip(ctx, msg, conn))]
 pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool) -> StringResult {
     let game = msg.game(conn)?;
     let (game, part) = match game {
@@ -176,6 +179,7 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         }
     }
 
+    let wins_span = info_span!("wins_map");
     let board = wins.into_iter()
         .enumerate()
         .map(|(i, (score, id))| async move {
@@ -186,16 +190,21 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                 p => p.to_string(),
             };
             let user_id = UserId(id.parse().unwrap());
-            match user_id.to_user(&ctx.http).await {
+            let user = user_id.to_user(&ctx)
+                .instrument(info_span!("UserId::to_user", user_id = display(user_id)))
+                .await;
+            match user {
                 Ok(user) => {
-                    let nick = user.nick_in(&ctx.http, msg.guild_id.unwrap()).await;
+                    let nick = user.nick_in(&ctx.http, msg.guild_id.unwrap())
+                        .instrument(info_span!("User::nick_in"))
+                        .await;
                     Ok((format!("{}. {}", position, nick.unwrap_or(user.name)), score, false))
                 }
                 Err(e) => Err(e),
             }
-        });
+        }.instrument(info_span!("map_fn")));
 
-    let board = futures::future::join_all(board).await
+    let board = futures::future::join_all(board).instrument(wins_span).await
         .into_iter().collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(Some(Box::new(move |m| {
@@ -229,8 +238,10 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
         }
     };
 
-    let player = player.to_user(&ctx.http).await?;
-    let nick = player.nick_in(&ctx.http, msg.guild_id.unwrap()).await
+    let player = player.to_user(&ctx.http).instrument(info_span!("UserId::to_user")).await?;
+    let nick = player.nick_in(&ctx.http, msg.guild_id.unwrap())
+        .instrument(info_span!("User::nick_in"))
+        .await
         .unwrap_or(player.name.clone());
 
     Ok(Some(Box::new(move |m|
@@ -238,6 +249,7 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
     )))
 }
 
+#[instrument(skip(_ctx, msg, conn))]
 pub async fn change(_ctx: &Context, msg: &Message, conn: PgPooledConn) -> StringResult {
     let game = msg.game(&conn)?;
 
