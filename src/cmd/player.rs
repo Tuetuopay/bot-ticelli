@@ -179,32 +179,27 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         }
     }
 
-    let wins_span = info_span!("wins_map");
     let board = wins.into_iter()
+        .map(|(score, id)| (score, id.parse::<u64>().unwrap()))
         .enumerate()
-        .map(|(i, (score, id))| async move {
-            let position = match i + 1 + ((page - 1) * per_page) as usize {
-                1 => "🥇".to_owned(),
-                2 => "🥈".to_owned(),
-                3 => "🥉".to_owned(),
-                p => p.to_string(),
-            };
-            let user_id = UserId(id.parse().unwrap());
-            let user = user_id.to_user(&ctx)
-                .instrument(info_span!("UserId::to_user", user_id = display(user_id)))
-                .await;
-            match user {
-                Ok(user) => {
-                    let nick = user.nick_in(&ctx.http, msg.guild_id.unwrap())
-                        .instrument(info_span!("User::nick_in"))
-                        .await;
-                    Ok((format!("{}. {}", position, nick.unwrap_or(user.name)), score, false))
-                }
-                Err(e) => Err(e),
-            }
-        }.instrument(info_span!("map_fn")));
+        .map(|(i, (score, id))| {
+            let span = info_span!("map_fn");
+            async move {
+                let position = match i + 1 + ((page - 1) * per_page) as usize {
+                    1 => "🥇".to_owned(),
+                    2 => "🥈".to_owned(),
+                    3 => "🥉".to_owned(),
+                    p => p.to_string(),
+                };
+                let span = info_span!("GuildId::member", user_id = display(id));
+                msg.guild_id.unwrap()
+                    .member(&ctx, id).instrument(span).await
+                    .map(|member| (format!("{}. {}", position, member.display_name()), score, false))
+            }.instrument(span)
+        });
 
-    let board = futures::future::join_all(board).instrument(wins_span).await
+    let span = info_span!("wins_map");
+    let board = futures::future::join_all(board).instrument(span).await
         .into_iter().collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(Some(Box::new(move |m| {
