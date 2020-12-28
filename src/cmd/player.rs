@@ -181,32 +181,28 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
 
     let cache = ctx.cache().await;
     let board = wins.into_iter()
-        .map(|(score, id)| (score, id.parse::<u64>().unwrap()))
+        .map(|(score, id)| (score, id.parse::<u64>().unwrap(), cache.clone(), info_span!("map_fn")))
         .enumerate()
-        .map(|(i, (score, id))| {
-            let cache = cache.clone();
-            let span = info_span!("map_fn");
-            async move {
-                let position = match i + 1 + ((page - 1) * per_page) as usize {
-                    1 => "🥇".to_owned(),
-                    2 => "🥈".to_owned(),
-                    3 => "🥉".to_owned(),
-                    p => p.to_string(),
-                };
-                let member = cache.member(&ctx, msg.guild_id.unwrap(), id).await;
-                let name = match member {
-                    Ok(member) => Ok(member.display_name().to_string()),
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to fetch member #{} {}: {}, falling back to fetching the user. \
-                            Maybe the user left the guild?", i, id, e
-                        );
-                        cache.user(&ctx, id).await.map(|user| user.name)
-                    }
-                };
-                name.map(|name| (format!("{}. {}", position, name), score, false))
-            }.instrument(span)
-        });
+        .map(|(i, (score, id, cache, span))| async move {
+            let position = match i + 1 + ((page - 1) * per_page) as usize {
+                1 => "🥇".to_owned(),
+                2 => "🥈".to_owned(),
+                3 => "🥉".to_owned(),
+                p => p.to_string(),
+            };
+            let member = cache.member(&ctx, msg.guild_id.unwrap(), id).await;
+            let name = match member {
+                Ok(member) => Ok(member.display_name().to_string()),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to fetch member #{} {}: {}, falling back to fetching the user. \
+                        Maybe the user left the guild?", i, id, e
+                    );
+                    cache.user(&ctx, id).await.map(|user| user.name)
+                }
+            };
+            name.map(|name| (format!("{}. {}", position, name), score, false))
+        }.instrument(span));
 
     let span = info_span!("wins_map");
     let board = futures::future::join_all(board).instrument(span).await
