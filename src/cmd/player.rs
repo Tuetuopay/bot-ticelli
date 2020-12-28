@@ -12,7 +12,7 @@ use serenity::{
 use tracing::{info_span, instrument, Instrument};
 
 use crate::error::Error;
-use crate::extensions::MessageExt;
+use crate::extensions::{ContextExt, MessageExt};
 use crate::models::*;
 use crate::paginate::*;
 use crate::PgPooledConn;
@@ -179,10 +179,12 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         }
     }
 
+    let cache = ctx.cache().await;
     let board = wins.into_iter()
         .map(|(score, id)| (score, id.parse::<u64>().unwrap()))
         .enumerate()
         .map(|(i, (score, id))| {
+            let cache = cache.clone();
             let span = info_span!("map_fn");
             async move {
                 let position = match i + 1 + ((page - 1) * per_page) as usize {
@@ -191,9 +193,8 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                     3 => "🥉".to_owned(),
                     p => p.to_string(),
                 };
-                let span = info_span!("GuildId::member", user_id = display(id));
-                msg.guild_id.unwrap()
-                    .member(&ctx, id).instrument(span).await
+                cache
+                    .member(&ctx, msg.guild_id.unwrap(), id).await
                     .map(|member| (format!("{}. {}", position, member.display_name()), score, false))
             }.instrument(span)
         });
