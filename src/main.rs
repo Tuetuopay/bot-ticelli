@@ -5,12 +5,15 @@ extern crate diesel;
 
 use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
 use opentelemetry::KeyValue;
-use serenity::prelude::*;
-use serenity::framework::StandardFramework;
+use serenity::{
+    framework::StandardFramework,
+    prelude::*,
+};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
 
 mod bot;
 mod cmd;
+mod cache;
 mod config;
 mod error;
 mod extensions;
@@ -19,6 +22,7 @@ mod paginate;
 mod schema;
 
 use bot::Bot;
+use cache::Cache;
 
 struct PgPool;
 impl TypeMapKey for PgPool {
@@ -91,10 +95,11 @@ async fn main() {
     let mut client = Client::builder(&config.auth.token)
         .event_handler(Bot)
         .framework(framework)
+        .type_map_insert::<PgPool>(pool)
+        .type_map_insert::<WinSentences>(config.bot_config.win_sentences)
+        .type_map_insert::<Cache>(Cache::default())
         .await
         .expect("Failed to create discord client");
-    client.data.write().await.insert::<PgPool>(pool);
-    client.data.write().await.insert::<WinSentences>(config.bot_config.win_sentences);
 
     tracing::info!("Runing app...");
     client.start().await.expect("Client error")

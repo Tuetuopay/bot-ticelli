@@ -8,26 +8,54 @@ use diesel::prelude::{ExpressionMethods, RunQueryDsl};
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
-        Args,
-        CommandGroup,
-        CommandResult,
-        HelpOptions,
         help_commands,
-        macros::{command, group, hook, help},
+        macros::{command, group, help, hook},
+        Args, CommandGroup, CommandResult, HelpOptions,
     },
-    model::prelude::{Attachment, Message, UserId},
+    model::prelude::{Attachment, Guild, GuildId, Member, Message, UserId, GuildMembersChunkEvent},
 };
 use tracing::{Instrument, instrument};
 
 use crate::{PgPool, PgPooledConn};
 use crate::cmd::StringResult;
 use crate::error::{Error, ErrorResultExt};
-use crate::extensions::{ConnectionExt, MessageExt};
+use crate::extensions::*;
 use crate::models::*;
 
 pub struct Bot;
 
-impl EventHandler for Bot {}
+#[serenity::async_trait]
+impl EventHandler for Bot {
+    #[instrument(skip(self, ctx, guild))]
+    async fn guild_create(&self, ctx: Context, guild: Guild, is_new: bool) {
+        tracing::debug!("Guild created {:?}", guild.id);
+
+        // List guild members
+        match guild.members(&ctx, Some(200), None).await {
+            Ok(members) => ctx.cache().await.batch_update(members).await,
+            Err(e) => tracing::error!("Failed to fetch guild members: {}", e),
+        }
+    }
+
+    #[instrument(skip(self, ctx))]
+    async fn guild_member_addition(&self, ctx: Context, _guild: GuildId, member: Member) {
+        tracing::debug!("guild member added");
+        ctx.cache().await.update(member).await;
+    }
+
+    #[instrument(skip(self, ctx))]
+    async fn guild_member_update(&self, ctx: Context, _old: Option<Member>, new: Member) {
+        tracing::debug!("guild member updated");
+        ctx.cache().await.update(new).await;
+    }
+
+    #[instrument(skip(self, ctx, chunk))]
+    async fn guild_members_chunk(&self, ctx: Context, chunk: GuildMembersChunkEvent) {
+        tracing::debug!("recieved guild member chunk with {} members", chunk.members.len());
+        let members = chunk.members.into_iter().map(|(_, v)| v).collect();
+        ctx.cache().await.batch_update(members).await;
+    }
+}
 
 #[hook]
 pub async fn filter_command(_: &Context, msg: &Message, _: &str) -> bool {

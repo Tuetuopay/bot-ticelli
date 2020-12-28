@@ -5,8 +5,9 @@
 use std::future::Future;
 
 use diesel::{pg::PgConnection, result::Error};
-use serenity::model::prelude::Message;
+use serenity::{client::Context, model::prelude::Message};
 
+use crate::cache::Cache;
 use crate::models::*;
 use crate::PgPooledConn;
 
@@ -34,5 +35,17 @@ impl ConnectionExt for PgConnection {
                 tokio::runtime::Handle::current().block_on(future)
             })
         })
+    }
+}
+
+#[serenity::async_trait]
+pub trait ContextExt {
+    async fn cache(&self) -> Cache;
+}
+
+#[serenity::async_trait]
+impl ContextExt for Context {
+    async fn cache(&self) -> Cache {
+        self.data.read().await.get::<Cache>().unwrap().clone()
     }
 }
