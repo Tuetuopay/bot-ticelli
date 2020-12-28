@@ -193,9 +193,18 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                     3 => "🥉".to_owned(),
                     p => p.to_string(),
                 };
-                cache
-                    .member(&ctx, msg.guild_id.unwrap(), id).await
-                    .map(|member| (format!("{}. {}", position, member.display_name()), score, false))
+                let member = cache.member(&ctx, msg.guild_id.unwrap(), id).await;
+                let name = match member {
+                    Ok(member) => Ok(member.display_name().to_string()),
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to fetch member #{} {}: {}, falling back to fetching the user. \
+                            Maybe the user left the guild?", i, id, e
+                        );
+                        cache.user(&ctx, id).await.map(|user| user.name)
+                    }
+                };
+                name.map(|name| (format!("{}. {}", position, name), score, false))
             }.instrument(span)
         });
 
