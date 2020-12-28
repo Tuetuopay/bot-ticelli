@@ -11,10 +11,10 @@ clap = "2.33"
 diesel = { version = "1.4", features = ["r2d2", "postgres", "uuidv07", "chrono"] }
 barrel = "0.6"
 futures = "0.3"
-itertools = "0.9"
+itertools = "0.10"
 opentelemetry = "0.10"
 opentelemetry-jaeger = "0.9"
-rand = "0.7"
+rand = "0.8"
 tokio = { version = "0.2", features = ["rt-threaded"] }
 toml = "0.5"
 tracing = "0.1"
