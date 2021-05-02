@@ -174,7 +174,7 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                 m.content(MessageBuilder::new()
                     .push("Mais oui mais oui ")
                     .mention(&first)
-                    .push(", tu es toujours premier ..."))
+                    .push(", tu es toujours en tête ..."))
             )))
         }
     }
