@@ -84,7 +84,7 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
     if winner.bot {
         return Err(Error::StfuBot)
     }
-    if winner.id == msg.author.id {
+    if winner.id == msg.author.id && !force {
         // TODO this should be an error
         return Ok(Some(MessageBuilder::new()
             .mention(&msg.author)
