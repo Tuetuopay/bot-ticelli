@@ -18,7 +18,7 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-debug-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo build
+      run: 'cargo --version && rustc --version && cargo build'
     - uses: actions/upload-artifact@v2
       with:
         name: bot-ticelli
