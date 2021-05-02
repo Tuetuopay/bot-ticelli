@@ -62,13 +62,15 @@ pub async fn filter_command(_: &Context, msg: &Message, _: &str) -> bool {
     msg.attachments.len() == 0
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("skip")]
 #[description("Passer son tour.")]
 #[num_args(0)]
 #[help_available]
 #[only_in(guild)]
-async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult { cmd_skip_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_skip")]
+async fn cmd_skip_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::player::skip(ctx, msg, &conn));
@@ -79,7 +81,6 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("win")]
 #[description("Marquer un joueur comme gagnant")]
 #[usage("<joueur>")]
@@ -87,7 +88,10 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(1)]
 #[help_available]
 #[only_in(guild)]
-async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult { cmd_win_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_win")]
+async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn, false));
@@ -98,7 +102,6 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("show")]
 #[description("Afficher le scoreboard")]
 #[min_args(0)]
@@ -108,7 +111,10 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 #[bucket(command_limiter)]
-async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult { cmd_show_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_show")]
+async fn cmd_show_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = crate::cmd::player::show(ctx, msg, conn)
@@ -121,7 +127,6 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("reset")]
 #[description("Gère le reset des scores")]
 #[usage("[do|list|cancel <id>]")]
@@ -129,7 +134,10 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 #[max_args(2)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
-async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult { cmd_reset_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_reset")]
+async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::admin::reset(ctx, msg, &conn));
@@ -140,14 +148,16 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("pic")]
 #[description("Affiche l'image à deviner")]
 #[num_args(0)]
 #[help_available]
 #[only_in(guild)]
 #[bucket(command_limiter)]
-async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult { cmd_pic_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_pic")]
+async fn cmd_pic_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = crate::cmd::player::pic(ctx, msg, conn)
@@ -160,12 +170,14 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("change")]
 #[description("Changer de photo, pour les indécis")]
 #[num_args(0)]
 #[only_in(guild)]
-async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult { cmd_change_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_change")]
+async fn cmd_change_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = crate::cmd::player::change(ctx, msg, conn).await;
@@ -176,13 +188,17 @@ async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("force_skip")]
 #[description("Force la main à passer")]
 #[num_args(0)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
 async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_force_skip_(ctx, msg).await
+}
+
+#[instrument(skip(ctx, msg), name = "cmd_force_skip")]
+async fn cmd_force_skip_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::admin::force_skip(ctx, msg, &conn));
@@ -193,13 +209,15 @@ async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("start")]
 #[description("Démarre une nouvelle partie")]
 #[num_args(0)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
-async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
+async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult { cmd_start_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "cmd_start")]
+async fn cmd_start_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::admin::start(ctx, msg, &conn));
@@ -210,13 +228,17 @@ async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[command("force_win")]
 #[description("Force une victoire d'un joueur")]
 #[num_args(1)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
 async fn cmd_force_win(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_force_win_(ctx, msg).await
+}
+
+#[instrument(skip(ctx, msg), name = "cmd_force_win")]
+async fn cmd_force_win_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
     let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn, true));
@@ -227,7 +249,6 @@ async fn cmd_force_win(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[instrument(skip(ctx, msg))]
 #[help]
 #[no_help_available_text("Commande inexistante")]
 #[usage_sample_label("Exemple")]
@@ -243,7 +264,8 @@ async fn cmd_help(
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>
 ) -> CommandResult {
-    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
+    let span = tracing::info_span!("cmd_help", ?args, ?help_options, ?groups, ?owners);
+    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).instrument(span).await;
     Ok(())
 }
 
@@ -251,9 +273,11 @@ async fn cmd_help(
 #[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start, cmd_force_win, cmd_change)]
 pub struct General;
 
-#[instrument(skip(ctx, msg))]
 #[hook]
-pub async fn on_message(ctx: &Context, msg: &Message) {
+pub async fn on_message(ctx: &Context, msg: &Message) { on_message_(ctx, msg).await }
+
+#[instrument(skip(ctx, msg), name = "on_message")]
+pub async fn on_message_(ctx: &Context, msg: &Message) {
     tokio::spawn(log_message(ctx.clone(), msg.clone()));
 
     // Find picture attachment
