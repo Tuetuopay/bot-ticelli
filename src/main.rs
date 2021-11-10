@@ -9,7 +9,7 @@ use serenity::{
     framework::StandardFramework,
     prelude::*,
 };
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 mod bot;
 mod cmd;
@@ -35,7 +35,7 @@ impl TypeMapKey for WinSentences {
     type Value = Vec<String>;
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
     let matches = clap_app!(bot =>
         (version: env!("CARGO_PKG_VERSION"))
@@ -49,25 +49,24 @@ async fn main() {
         .unwrap();
 
     // Install tracing framework with Jaeger sink
-    let _guard = if let Some(ref tracing) = config.tracing_config {
+    if let Some(ref tracing) = config.tracing_config {
         if let Some(ref jaeger) = tracing.jaeger {
-            let (tracer, uninstall) = opentelemetry_jaeger::new_pipeline()
+            let tracer = opentelemetry_jaeger::new_pipeline()
                 .with_agent_endpoint(jaeger)
                 .with_service_name("bot-ticelli")
                 .with_tags(vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))])
-                .install()
+                .install_simple()
                 .expect("Failed to install jaeger tracing");
             let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-            let subscriber = tracing_subscriber::Registry::default()
+            tracing_subscriber::registry()
                 .with(tracing_subscriber::fmt::layer())
                 .with(EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new("debug")))
-                .with(telemetry);
-            tracing::subscriber::set_global_default(subscriber).expect("Failed to install tracing");
+                .with(telemetry)
+                .try_init()
+                .expect("Failed to install tracing");
             tracing::info!("Installed jaeger tracing");
-
-            Some(uninstall)
-        } else { None }
-    } else { None };
+        }
+    }
 
     // Connect to database
     tracing::info!("Connecting to postgres...");
