@@ -167,7 +167,7 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
 
     if let Some((_, first)) = wins.first() {
         let first = UserId(first.parse().unwrap());
-        if first == msg.author.id {
+        if first == msg.author.id && page == 1 {
             return Ok(Some(Box::new(move |m|
                 m.content(MessageBuilder::new()
                     .push("Mais oui mais oui ")
