@@ -27,7 +27,7 @@ pub struct Bot;
 #[serenity::async_trait]
 impl EventHandler for Bot {
     #[instrument(skip(self, ctx, guild))]
-    async fn guild_create(&self, ctx: Context, guild: Guild, is_new: bool) {
+    async fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
         tracing::debug!("Guild created {:?}", guild.id);
 
         // List guild members
@@ -59,7 +59,7 @@ impl EventHandler for Bot {
 
 #[hook]
 pub async fn filter_command(_: &Context, msg: &Message, _: &str) -> bool {
-    msg.attachments.len() == 0
+    msg.attachments.is_empty()
 }
 
 #[command("skip")]
@@ -283,7 +283,7 @@ pub async fn on_message_(ctx: &Context, msg: &Message) {
     tokio::spawn(log_message(ctx.clone(), msg.clone()));
 
     // Find picture attachment
-    let attachment = match msg.attachments.iter().filter(|a| a.height.is_some()).next() {
+    let attachment = match msg.attachments.iter().find(|a| a.height.is_some()) {
         Some(att) => att,
         None => return,
     };
@@ -300,7 +300,7 @@ pub async fn on_message_(ctx: &Context, msg: &Message) {
 
     let res = tokio::task::block_in_place(||
         conn.build_transaction().serializable().run(||
-            on_participation(&ctx, &msg, &conn, attachment)));
+            on_participation(ctx, msg, &conn, attachment)));
 
     if let Ok(Some(reply)) = res.handle_err(&msg.channel_id, &ctx.http).await {
         msg.channel_id.say(&ctx.http, reply).await.expect("Failed to send message");
@@ -346,7 +346,7 @@ fn on_participation(
 
     println!("Saved participation {part:?}");
 
-    return Ok(Some("🔎 À vos claviers, une nouvelle photo est à trouver".to_owned()))
+    Ok(Some("🔎 À vos claviers, une nouvelle photo est à trouver".to_owned()))
 }
 
 async fn log_message(ctx: Context, msg: Message) {

@@ -36,7 +36,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 .select(par_dsl::win_id)
                 .load::<Option<Uuid>>(conn)?
                 .into_iter()
-                .filter_map(|id| id)
+                .flatten()
                 .collect::<Vec<_>>();
             diesel::update(
                 dsl::win
@@ -66,10 +66,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 .load::<(Option<Uuid>, DateTime<Utc>)>(conn)?
                 .into_iter()
                 .enumerate()
-                .filter_map(|(i, (id, at))| match id {
-                    Some(id) => Some(format!("{}. {id} à {at}", i + 1)),
-                    _ => None,
-                })
+                .filter_map(|(i, (id, at))| id.map(|id| format!("{}. {id} à {at}", i + 1)))
                 .join("\n");
             Ok(Some(format!("Resets:\n{resets}")))
         }
@@ -90,14 +87,14 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
 pub async fn force_skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
-    let game = msg.game(&conn)?;
+    let game = msg.game(conn)?;
     let part = match game {
         Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
         None => return Ok(None),
     };
 
-    part.skip(&conn)?;
+    part.skip(conn)?;
 
     Ok(Some(MessageBuilder::new()
         .push("A vos photos, ")
@@ -111,7 +108,7 @@ pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
     let game = msg.game(conn)?;
 
     if game.is_some() {
-        return Ok(Some(format!("Il y a déjà une partie en cours dans ce chan")))
+        return Ok(Some("Il y a déjà une partie en cours dans ce chan".to_owned()))
     }
 
     let guild = match msg.guild_id {
@@ -127,5 +124,5 @@ pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
     let game: Game = diesel::insert_into(game_dsl::game).values(game).get_result(conn)?;
     info!("Created new game: {game:?}");
 
-    Ok(Some(format!("Partie démarrée !")))
+    Ok(Some("Partie démarrée !".to_owned()))
 }

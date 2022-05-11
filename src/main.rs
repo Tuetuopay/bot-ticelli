@@ -62,7 +62,7 @@ async fn main() {
             let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
             tracing_subscriber::registry()
                 .with(tracing_subscriber::fmt::layer())
-                .with(EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new("debug")))
+                .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")))
                 .with(telemetry)
                 .try_init()
                 .expect("Failed to install tracing");

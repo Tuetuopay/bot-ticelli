@@ -51,10 +51,8 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
     };
 
     // Check that participation is valid
-    if !force {
-        if part.player_id != msg.author.id.to_string() {
-            return Err(Error::NotYourTurn)
-        }
+    if !force && part.player_id != msg.author.id.to_string() {
+        return Err(Error::NotYourTurn)
     }
     if part.picture_url.is_none() {
         return Err(Error::YouPostedNoPic)
@@ -145,7 +143,7 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         None => return Ok(None),
     };
 
-    let page = msg.content.split(' ').nth(1).map(|p| p.parse().ok()).flatten().unwrap_or(1);
+    let page = msg.content.split(' ').nth(1).and_then(|p| p.parse().ok()).unwrap_or(1);
     let per_page = 10;
 
     if page < 1 {
@@ -243,7 +241,7 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
     let nick = player.nick_in(&ctx.http, msg.guild_id.unwrap())
         .instrument(info_span!("User::nick_in"))
         .await
-        .unwrap_or(player.name.clone());
+        .unwrap_or_else(|| player.name.clone());
 
     Ok(Some(Box::new(move |m|
         m.embed(|e| e.author(|a| a.name(nick).icon_url(player.face())).image(url))
