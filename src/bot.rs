@@ -12,7 +12,7 @@ use serenity::{
         macros::{command, group, help, hook},
         Args, CommandGroup, CommandResult, HelpOptions,
     },
-    model::prelude::{Attachment, Guild, GuildId, Member, Message, UserId, GuildMembersChunkEvent},
+    model::prelude::{Attachment, Guild, Member, Message, UserId, GuildMembersChunkEvent},
 };
 use tracing::{Instrument, instrument};
 
@@ -33,7 +33,7 @@ impl EventHandler for Bot {
         // List guild members
         match guild.members(&ctx, Some(200), None).await {
             Ok(members) => ctx.cache().await.batch_update(members).await,
-            Err(e) => tracing::error!("Failed to fetch guild members: {}", e),
+            Err(e) => tracing::error!("Failed to fetch guild members: {e}"),
         }
     }
 
@@ -265,7 +265,9 @@ async fn cmd_help(
     owners: HashSet<UserId>
 ) -> CommandResult {
     let span = tracing::info_span!("cmd_help", ?args, ?help_options, ?groups, ?owners);
-    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).instrument(span).await;
+    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners)
+        .instrument(span)
+        .await?;
     Ok(())
 }
 
@@ -342,7 +344,7 @@ fn on_participation(
             .get_result(conn)?
     };
 
-    println!("Saved participation {:?}", part);
+    println!("Saved participation {part:?}");
 
     return Ok(Some("🔎 À vos claviers, une nouvelle photo est à trouver".to_owned()))
 }
@@ -350,21 +352,14 @@ fn on_participation(
 async fn log_message(ctx: Context, msg: Message) {
     let guild = match msg.guild_id {
         Some(guild) => match guild.name(&ctx.cache) {
-            Some(name) => format!("[{}]", name),
+            Some(name) => format!("[{name}]"),
             None => "(unknown)".to_owned(),
         },
         None => "(DM)".to_owned(),
     };
     let chan = match msg.channel_id.name(&ctx.cache).await{
-        Some(name) => format!("#{}", name),
+        Some(name) => format!("#{name}"),
         None => "?#".to_owned(),
     };
-    println!(
-        "({}) {} {} @{}: {}",
-        msg.id,
-        guild,
-        chan,
-        msg.author.tag(),
-        msg.content_safe(&ctx.cache),
-    );
+    println!("({}) {guild} {chan} @{}: {}", msg.id, msg.author.tag(), msg.content_safe(&ctx.cache));
 }

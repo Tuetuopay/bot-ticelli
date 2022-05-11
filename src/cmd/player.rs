@@ -98,7 +98,7 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
         winner_id: &winner.id.0.to_string(),
     };
     let win: Win = diesel::insert_into(dsl::win).values(win).get_result(conn)?;
-    println!("Saved win {:?}", win);
+    println!("Saved win {win:?}");
 
     // Mark participation as won
     diesel::update(&part)
@@ -195,13 +195,13 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                 Ok(member) => Ok(member.display_name().to_string()),
                 Err(e) => {
                     tracing::warn!(
-                        "Failed to fetch member #{} {}: {}, falling back to fetching the user. \
-                        Maybe the user left the guild?", i, id, e
+                        "Failed to fetch member #{i} {id}: {e}, falling back to fetching the user. \
+                        Maybe the user left the guild?",
                     );
                     cache.user(&ctx, id).await.map(|user| user.name)
                 }
             };
-            name.map(|name| (format!("{}. {}", position, name), score, false))
+            name.map(|name| (format!("{position}. {name}"), score, false))
         }.instrument(span));
 
     let span = info_span!("wins_map");
@@ -210,7 +210,7 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
 
     Ok(Some(Box::new(move |m| {
         m.embed(|e| {
-            e.title(format!("👑 👑 👑 Scores ({}/{}) 👑 👑 👑", page, page_count));
+            e.title(format!("👑 👑 👑 Scores ({page}/{page_count}) 👑 👑 👑"));
             e.colour(Colour::GOLD);
             e.fields(board);
             e

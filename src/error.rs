@@ -29,7 +29,7 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if let Some(error) = self.source() {
-            write!(f, "{}", error)
+            write!(f, "{error}")
         } else {
             Ok(())
         }
@@ -48,17 +48,18 @@ impl StdError for Error {
 
 impl Error {
     pub fn as_message(&self) -> Option<String> {
-        match self {
-            Self::Db(_) | Self::Serenity(_) => Some("Erreur interne".to_owned()),
-            Self::NoParticipant => Some("⁉️ Mais personne n'a la main ...".to_owned()),
-            Self::NotYourTurn => Some("❌ Tut tut tut, c'est pas toi qui a la main...".to_owned()),
-            Self::YouPostedNoPic => Some("🤦 Hrmpf t'as pas mis de photo toi ...".to_owned()),
-            Self::StfuBot => Some("🤖 Tg le bot !".to_owned()),
-            Self::PicAlreadyPosted => Some("🦜 T'as déjà mis une photo coco.".to_owned()),
-            Self::InvalidPage => Some("Page invalide".to_owned()),
-            Self::InvalidResetId => Some("ID de reset invalide".to_owned()),
-            Self::UnknownArguments => Some("Arguments inconnus".to_owned()),
-        }
+        let ret = match self {
+            Self::Db(_) | Self::Serenity(_) => Some("Erreur interne"),
+            Self::NoParticipant => Some("⁉️ Mais personne n'a la main ..."),
+            Self::NotYourTurn => Some("❌ Tut tut tut, c'est pas toi qui a la main..."),
+            Self::YouPostedNoPic => Some("🤦 Hrmpf t'as pas mis de photo toi ..."),
+            Self::StfuBot => Some("🤖 Tg le bot !"),
+            Self::PicAlreadyPosted => Some("🦜 T'as déjà mis une photo coco."),
+            Self::InvalidPage => Some("Page invalide"),
+            Self::InvalidResetId => Some("ID de reset invalide"),
+            Self::UnknownArguments => Some("Arguments inconnus"),
+        };
+        ret.map(|s| s.to_owned())
     }
 }
 

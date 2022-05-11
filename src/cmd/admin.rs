@@ -10,6 +10,7 @@ use serenity::{
     model::prelude::Message,
     utils::MessageBuilder,
 };
+use tracing::info;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -51,7 +52,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 part.skip(conn)?;
             }
 
-            Ok(Some(format!("Scores reset avec ID {}", reset_id)))
+            Ok(Some(format!("Scores reset avec ID {reset_id}")))
         }
         [_, "list"] => {
             use diesel::sql_types::Timestamptz;
@@ -66,11 +67,11 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 .into_iter()
                 .enumerate()
                 .filter_map(|(i, (id, at))| match id {
-                    Some(id) => Some(format!("{}. {} à {}", i + 1, id, at)),
+                    Some(id) => Some(format!("{}. {id} à {at}", i + 1)),
                     _ => None,
                 })
                 .join("\n");
-            Ok(Some(format!("Resets:\n{}", resets)))
+            Ok(Some(format!("Resets:\n{resets}")))
         }
         [_, "cancel", id] => {
             let reset_id: Uuid = id.parse().map_err(|_| Error::InvalidResetId)?;
@@ -81,7 +82,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 .execute(conn)
                 .optional()?
                 .ok_or(Error::InvalidResetId)?;
-            Ok(Some(format!("Reset {} annulé", reset_id)))
+            Ok(Some(format!("Reset {reset_id} annulé")))
         }
         [..] => Err(Error::UnknownArguments),
     }
@@ -124,7 +125,7 @@ pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
         creator_id: &msg.author.id.to_string(),
     };
     let game: Game = diesel::insert_into(game_dsl::game).values(game).get_result(conn)?;
-    println!("Created new game: {:?}", game);
+    info!("Created new game: {game:?}");
 
     Ok(Some(format!("Partie démarrée !")))
 }
