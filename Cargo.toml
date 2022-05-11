@@ -2,26 +2,25 @@
 name = "bot-ticelli"
 version = "1.2.3"
 authors = ["Tuetuopay <tuetuopay@me.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
 chrono = "0.4"
-clap = "2.33"
+clap = { version = "3", features = ["derive"] }
 diesel = { version = "1.4", features = ["r2d2", "postgres", "uuidv07", "chrono"] }
 futures = "0.3"
 itertools = "0.10"
-opentelemetry = "0.16"
-opentelemetry-jaeger = "0.15"
+opentelemetry = "0.17"
+opentelemetry-jaeger = "0.16"
 rand = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 toml = "0.5"
 tracing = "0.1"
 tracing-futures = "0.2"
-tracing-opentelemetry = "0.16"
+tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = "1.0"
 serde_derive = "1.0"
-serenity = "0.10"
-serenity_utils = "0.6"
+serenity = "0.11"
 uuid = { version = "0.8", features = ["v4"] }

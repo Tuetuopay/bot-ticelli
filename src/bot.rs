@@ -38,7 +38,7 @@ impl EventHandler for Bot {
     }
 
     #[instrument(skip(self, ctx))]
-    async fn guild_member_addition(&self, ctx: Context, _guild: GuildId, member: Member) {
+    async fn guild_member_addition(&self, ctx: Context, member: Member) {
         tracing::debug!("guild member added");
         ctx.cache().await.update(member).await;
     }
@@ -349,13 +349,13 @@ fn on_participation(
 
 async fn log_message(ctx: Context, msg: Message) {
     let guild = match msg.guild_id {
-        Some(guild) => match guild.name(&ctx.cache).await {
+        Some(guild) => match guild.name(&ctx.cache) {
             Some(name) => format!("[{}]", name),
             None => "(unknown)".to_owned(),
         },
         None => "(DM)".to_owned(),
     };
-    let chan = match msg.channel_id.name(&ctx.cache) .await{
+    let chan = match msg.channel_id.name(&ctx.cache).await{
         Some(name) => format!("#{}", name),
         None => "?#".to_owned(),
     };
@@ -365,6 +365,6 @@ async fn log_message(ctx: Context, msg: Message) {
         guild,
         chan,
         msg.author.tag(),
-        msg.content_safe(&ctx.cache).await,
+        msg.content_safe(&ctx.cache),
     );
 }

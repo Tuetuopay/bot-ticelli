@@ -1,10 +1,9 @@
 #[macro_use]
-extern crate clap;
-#[macro_use]
 extern crate diesel;
 
+use clap::Parser;
 use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
-use opentelemetry::KeyValue;
+use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
 use serenity::{
     framework::StandardFramework,
     prelude::*,
@@ -35,26 +34,29 @@ impl TypeMapKey for WinSentences {
     type Value = Vec<String>;
 }
 
+#[derive(Parser, Debug)]
+#[clap(author, version)]
+struct Args {
+    /// Config file path.
+    #[clap(short, long, default_value = "config.toml")]
+    config: String,
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
-    let matches = clap_app!(bot =>
-        (version: env!("CARGO_PKG_VERSION"))
-        (author: env!("CARGO_PKG_AUTHORS"))
-        (@arg CONFIG: -c --config +takes_value "Config file path. Defaults to config.toml")
-    ).get_matches();
-
-    let config = matches.value_of("CONFIG").unwrap_or("config.toml");
-    let config = config::load_config(&config)
-        .map_err(|e| format!("Failed to load {}: {}", config, e))
+    let args = Args::parse();
+    let config = config::load_config(&args.config)
+        .map_err(|e| format!("Failed to load {}: {e}", args.config))
         .unwrap();
 
     // Install tracing framework with Jaeger sink
     if let Some(ref tracing) = config.tracing_config {
         if let Some(ref jaeger) = tracing.jaeger {
+            let tags = vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))];
             let tracer = opentelemetry_jaeger::new_pipeline()
                 .with_agent_endpoint(jaeger)
                 .with_service_name("bot-ticelli")
-                .with_tags(vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))])
+                .with_trace_config(Config::default().with_resource(Resource::new(tags)))
                 .install_simple()
                 .expect("Failed to install jaeger tracing");
             let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
@@ -91,7 +93,11 @@ async fn main() {
         }).await;
     }
 
-    let mut client = Client::builder(&config.auth.token)
+    let intents = GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_MEMBERS
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
+    let mut client = Client::builder(&config.auth.token, intents)
         .event_handler(Bot)
         .framework(framework)
         .type_map_insert::<PgPool>(pool)
