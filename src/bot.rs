@@ -12,12 +12,15 @@ use serenity::{
         macros::{command, group, help, hook},
         Args, CommandGroup, CommandResult, HelpOptions,
     },
-    model::prelude::{Attachment, Guild, Member, Message, UserId, GuildMembersChunkEvent},
+    model::prelude::{
+        Attachment, Guild, GuildMembersChunkEvent, Member, Message, Reaction, ReactionType, UserId,
+    },
+    utils::Colour,
 };
 use tracing::{Instrument, instrument};
 
-use crate::{PgPool, PgPooledConn};
-use crate::cmd::StringResult;
+use crate::{BotUserId, PgPool, PgPooledConn};
+use crate::cmd::{player::scoreboard_message, StringResult};
 use crate::error::{Error, ErrorResultExt};
 use crate::extensions::*;
 use crate::models::*;
@@ -26,6 +29,10 @@ pub struct Bot;
 
 #[serenity::async_trait]
 impl EventHandler for Bot {
+    async fn ready(&self, ctx: Context, data: serenity::model::gateway::Ready) {
+        ctx.data.write().await.insert::<BotUserId>(data.user.id);
+    }
+
     #[instrument(skip(self, ctx, guild))]
     async fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
         tracing::debug!("Guild created {:?}", guild.id);
@@ -54,6 +61,14 @@ impl EventHandler for Bot {
         tracing::debug!("recieved guild member chunk with {} members", chunk.members.len());
         let members = chunk.members.into_iter().map(|(_, v)| v).collect();
         ctx.cache().await.batch_update(members).await;
+    }
+
+    #[instrument(skip(self, ctx, react))]
+    async fn reaction_add(&self, ctx: Context, react: Reaction) {
+        let res = on_reaction(&ctx, &react).await;
+        if let Err(e) = res.handle_err(&react.channel_id, &ctx.http).await {
+            tracing::error!("{e:?}");
+        }
     }
 }
 
@@ -121,7 +136,9 @@ async fn cmd_show_(ctx: &Context, msg: &Message) -> CommandResult {
         .instrument(tracing::info_span!("show"))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
-        msg.channel_id.send_message(&ctx.http, reply).await?;
+        let msg = msg.channel_id.send_message(&ctx.http, reply).await?;
+        msg.react(&ctx, ReactionType::Unicode("⬅️".to_owned())).await?;
+        msg.react(&ctx, ReactionType::Unicode("➡️".to_owned())).await?;
     }
 
     Ok(())
@@ -362,4 +379,59 @@ async fn log_message(ctx: Context, msg: Message) {
         None => "?#".to_owned(),
     };
     println!("({}) {guild} {chan} @{}: {}", msg.id, msg.author.tag(), msg.content_safe(&ctx.cache));
+}
+
+async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
+    let bot_id = match ctx.data.read().await.get::<BotUserId>() {
+        Some(id) => id.to_owned(),
+        None => {
+            tracing::warn!("Got react on message but bot it not cached");
+            return Ok(())
+        }
+    };
+    if react.user_id == Some(bot_id) { return Ok(()) }
+
+    tracing::debug!("reaction added: {react:?}");
+    let mut msg = match ctx.cache.message(react.channel_id, react.message_id) {
+        Some(msg) => msg,
+        None => ctx.http.get_message(react.channel_id.0, react.message_id.0).await?,
+    };
+    // bug in serenity / discord: the fetched message has guild_id set to none. override it.
+    msg.guild_id = react.guild_id;
+
+    if msg.author.id != bot_id { return Ok(()) }
+    let page = msg.embeds.get(0)
+        .and_then(|embed| embed.title.as_ref())
+        .filter(|title| title.contains("Scores"))
+        .and_then(|title| title.split(|c| c == '(' || c == '/').nth(1))
+        .and_then(|page| page.parse::<i64>().ok());
+    let page = match page { Some(page) => page, None => return Ok(()) };
+    tracing::debug!("message: {msg:?}, page: {page}");
+
+    let page = if react.emoji == ReactionType::Unicode("➡️".to_owned()) {
+        page + 1
+    } else if react.emoji == ReactionType::Unicode("⬅️".to_owned()) && page > 1 {
+        page - 1
+    } else {
+        return Ok(())
+    };
+    tracing::debug!("switching to page {page}");
+
+    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get();
+    let conn = match conn {
+        Ok(conn) => conn,
+        Err(_e) => {
+            // TODO raise to sentry
+            msg.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
+            return Ok(())
+        }
+    };
+    let game = match msg.game(&conn)? {
+        Some((game, _)) => game,
+        None => return Ok(()),
+    };
+    let (title, board) = scoreboard_message(&ctx, conn, game, react.guild_id.unwrap(), page).await?;
+    msg.edit(&ctx, |m| m.embed(|e| e.title(title).colour(Colour::GOLD).fields(board))).await?;
+
+    Ok(())
 }

@@ -6,7 +6,7 @@ use diesel::prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl};
 use rand::seq::SliceRandom;
 use serenity::{
     client::Context,
-    model::prelude::{Message, UserId},
+    model::prelude::{GuildId, Message},
     utils::{Colour, MessageBuilder},
 };
 use tracing::{info_span, instrument, Instrument};
@@ -144,11 +144,23 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
     };
 
     let page = msg.content.split(' ').nth(1).and_then(|p| p.parse().ok()).unwrap_or(1);
-    let per_page = 10;
-
     if page < 1 {
         return Err(Error::InvalidPage)
     }
+
+    let (title, board) = scoreboard_message(ctx, conn, game, msg.guild_id.unwrap(), page).await?;
+
+    Ok(Some(Box::new(move |m| m.embed(|e| e.title(title).colour(Colour::GOLD).fields(board)))))
+}
+
+pub async fn scoreboard_message(
+    ctx: &Context,
+    conn: PgPooledConn,
+    game: Game,
+    guild: GuildId,
+    page: i64,
+) -> Result<(String, Vec<(String, i64, bool)>)> {
+    let per_page = 10;
 
     let (wins, count) = dsl::win.select((diesel::dsl::sql("count(win.id) as cnt"), dsl::winner_id))
         .filter(dsl::reset.eq(false))
@@ -165,17 +177,6 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         return Err(Error::InvalidPage)
     }
 
-    if let Some((_, first)) = wins.first() {
-        let first = UserId(first.parse().unwrap());
-        if first == msg.author.id && page == 1 {
-            return Ok(Some(Box::new(move |m|
-                m.content(MessageBuilder::new()
-                    .push("Mais oui mais oui ")
-                    .mention(&first)
-                    .push(", tu es toujours en tête ..."))
-            )))
-        }
-    }
 
     let cache = ctx.cache().await;
     let board = wins.into_iter()
@@ -188,7 +189,7 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
                 3 => "🥉".to_owned(),
                 p => p.to_string(),
             };
-            let member = cache.member(&ctx, msg.guild_id.unwrap(), id).await;
+            let member = cache.member(&ctx, guild, id).await;
             let name = match member {
                 Ok(member) => Ok(member.display_name().to_string()),
                 Err(e) => {
@@ -204,19 +205,12 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
 
     let span = info_span!("wins_map");
     let board = futures::future::join_all(board).instrument(span).await
-        .into_iter().collect::<std::result::Result<Vec<_>, _>>()?;
+        .into_iter().collect::<Result<Vec<_>, _>>()?;
 
-    Ok(Some(Box::new(move |m| {
-        m.embed(|e| {
-            e.title(format!("👑 👑 👑 Scores ({page}/{page_count}) 👑 👑 👑"));
-            e.colour(Colour::GOLD);
-            e.fields(board);
-            e
-        });
-        m
-    })))
+    Ok((format!("👑 👑 👑 Scores ({page}/{page_count}) 👑 👑 👑"), board))
 }
 
+//#[instrument(skip(ctx, msg, conn))]
 pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMessageResult {
     let game = msg.game(&conn)?;
     let part = match game {

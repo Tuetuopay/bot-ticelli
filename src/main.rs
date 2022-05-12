@@ -6,6 +6,7 @@ use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
 use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
 use serenity::{
     framework::StandardFramework,
+    model::id::UserId,
     prelude::*,
 };
 use tracing_subscriber::{EnvFilter, prelude::*};
@@ -32,6 +33,11 @@ pub type PgPooledConn = PooledConnection<ConnectionManager<PgConnection>>;
 struct WinSentences;
 impl TypeMapKey for WinSentences {
     type Value = Vec<String>;
+}
+
+struct BotUserId;
+impl TypeMapKey for BotUserId {
+    type Value = UserId;
 }
 
 #[derive(Parser, Debug)]
@@ -96,7 +102,8 @@ async fn main() {
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_MESSAGE_REACTIONS;
     let mut client = Client::builder(&config.auth.token, intents)
         .event_handler(Bot)
         .framework(framework)
