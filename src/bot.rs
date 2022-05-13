@@ -390,13 +390,14 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         }
     };
     if react.user_id == Some(bot_id) { return Ok(()) }
+    let guild_id = react.guild_id.unwrap();
 
     let mut msg = match ctx.cache.message(react.channel_id, react.message_id) {
         Some(msg) => msg,
         None => ctx.http.get_message(react.channel_id.0, react.message_id.0).await?,
     };
     // bug in serenity / discord: the fetched message has guild_id set to none. override it.
-    msg.guild_id = react.guild_id;
+    msg.guild_id = Some(guild_id);
 
     if msg.author.id != bot_id { return Ok(()) }
     let page = msg.embeds.get(0)
@@ -427,7 +428,11 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         Some((game, _)) => game,
         None => return Ok(()),
     };
-    let (title, board) = scoreboard_message(&ctx, conn, game, react.guild_id.unwrap(), page).await?;
+    let (title, board) = match scoreboard_message(&ctx, conn, game, guild_id, page).await {
+        Ok(res) => res,
+        Err(Error::InvalidPage) => return Ok(()),
+        Err(e) => return Err(e),
+    };
     msg.edit(&ctx, |m| m.embed(|e| e.title(title).colour(Colour::GOLD).fields(board))).await?;
 
     Ok(())
