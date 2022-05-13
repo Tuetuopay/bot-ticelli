@@ -391,7 +391,6 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
     };
     if react.user_id == Some(bot_id) { return Ok(()) }
 
-    tracing::debug!("reaction added: {react:?}");
     let mut msg = match ctx.cache.message(react.channel_id, react.message_id) {
         Some(msg) => msg,
         None => ctx.http.get_message(react.channel_id.0, react.message_id.0).await?,
@@ -406,7 +405,6 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         .and_then(|title| title.split(|c| c == '(' || c == '/').nth(1))
         .and_then(|page| page.parse::<i64>().ok());
     let page = match page { Some(page) => page, None => return Ok(()) };
-    tracing::debug!("message: {msg:?}, page: {page}");
 
     let page = if react.emoji == ReactionType::Unicode("➡️".to_owned()) {
         page + 1
@@ -415,7 +413,6 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
     } else {
         return Ok(())
     };
-    tracing::debug!("switching to page {page}");
 
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get();
     let conn = match conn {
