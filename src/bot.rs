@@ -392,6 +392,19 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
     if react.user_id == Some(bot_id) { return Ok(()) }
     let guild_id = react.guild_id.unwrap();
 
+    let conn = match ctx.data.read().await.get::<PgPool>().unwrap().get() {
+        Ok(conn) => conn,
+        Err(_e) => {
+            // TODO raise to sentry
+            react.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
+            return Ok(())
+        }
+    };
+    let game = match Game::get(&conn, guild_id.0, react.channel_id.0)? {
+        Some(game) => game,
+        None => return Ok(()),
+    };
+
     let mut msg = match ctx.cache.message(react.channel_id, react.message_id) {
         Some(msg) => msg,
         None => ctx.http.get_message(react.channel_id.0, react.message_id.0).await?,
@@ -415,19 +428,6 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         return Ok(())
     };
 
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get();
-    let conn = match conn {
-        Ok(conn) => conn,
-        Err(_e) => {
-            // TODO raise to sentry
-            msg.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
-            return Ok(())
-        }
-    };
-    let game = match msg.game(&conn)? {
-        Some((game, _)) => game,
-        None => return Ok(()),
-    };
     let (title, board) = match scoreboard_message(&ctx, conn, game, guild_id, page).await {
         Ok(res) => res,
         Err(Error::InvalidPage) => return Ok(()),
