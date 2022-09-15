@@ -2,18 +2,17 @@
 extern crate diesel;
 
 use clap::Parser;
-use diesel::{r2d2::{ConnectionManager, Pool, PooledConnection}, PgConnection};
-use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
-use serenity::{
-    framework::StandardFramework,
-    model::id::UserId,
-    prelude::*,
+use diesel::{
+    r2d2::{ConnectionManager, Pool, PooledConnection},
+    PgConnection,
 };
-use tracing_subscriber::{EnvFilter, prelude::*};
+use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
+use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod bot;
-mod cmd;
 mod cache;
+mod cmd;
 mod config;
 mod error;
 mod extensions;
@@ -91,12 +90,20 @@ async fn main() {
         .before(bot::filter_command);
 
     if let Some(rl) = config.bot_config.ratelimit {
-        framework = framework.bucket("command_limiter", |b| {
-            if let Some(delay) = rl.delay { b.delay(delay); }
-            if let Some(time_span) = rl.time_span { b.time_span(time_span); }
-            if let Some(limit) = rl.limit { b.limit(limit); }
-            b
-        }).await;
+        framework = framework
+            .bucket("command_limiter", |b| {
+                if let Some(delay) = rl.delay {
+                    b.delay(delay);
+                }
+                if let Some(time_span) = rl.time_span {
+                    b.time_span(time_span);
+                }
+                if let Some(limit) = rl.limit {
+                    b.limit(limit);
+                }
+                b
+            })
+            .await;
     }
 
     let intents = GatewayIntents::GUILDS

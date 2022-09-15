@@ -38,8 +38,4 @@ table! {
 joinable!(participation -> game (game_id));
 joinable!(participation -> win (win_id));
 
-allow_tables_to_appear_in_same_query!(
-    game,
-    participation,
-    win,
-);
+allow_tables_to_appear_in_same_query!(game, participation, win,);

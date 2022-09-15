@@ -17,13 +17,13 @@ use serenity::{
     },
     utils::Colour,
 };
-use tracing::{Instrument, instrument};
+use tracing::{instrument, Instrument};
 
-use crate::{BotUserId, PgPool, PgPooledConn};
 use crate::cmd::{player::scoreboard_message, StringResult};
 use crate::error::{Error, ErrorResultExt};
 use crate::extensions::*;
 use crate::models::*;
+use crate::{BotUserId, PgPool, PgPooledConn};
 
 pub struct Bot;
 
@@ -82,7 +82,9 @@ pub async fn filter_command(_: &Context, msg: &Message, _: &str) -> bool {
 #[num_args(0)]
 #[help_available]
 #[only_in(guild)]
-async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult { cmd_skip_(ctx, msg).await }
+async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_skip_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_skip")]
 async fn cmd_skip_(ctx: &Context, msg: &Message) -> CommandResult {
@@ -103,7 +105,9 @@ async fn cmd_skip_(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(1)]
 #[help_available]
 #[only_in(guild)]
-async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult { cmd_win_(ctx, msg).await }
+async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_win_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_win")]
 async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
@@ -126,15 +130,16 @@ async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 #[bucket(command_limiter)]
-async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult { cmd_show_(ctx, msg).await }
+async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_show_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_show")]
 async fn cmd_show_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let res = crate::cmd::player::show(ctx, msg, conn)
-        .instrument(tracing::info_span!("show"))
-        .await;
+    let res =
+        crate::cmd::player::show(ctx, msg, conn).instrument(tracing::info_span!("show")).await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         let msg = msg.channel_id.send_message(&ctx.http, reply).await?;
         msg.react(&ctx, ReactionType::Unicode("⬅️".to_owned())).await?;
@@ -151,7 +156,9 @@ async fn cmd_show_(ctx: &Context, msg: &Message) -> CommandResult {
 #[max_args(2)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
-async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult { cmd_reset_(ctx, msg).await }
+async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_reset_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_reset")]
 async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
@@ -171,15 +178,15 @@ async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
 #[help_available]
 #[only_in(guild)]
 #[bucket(command_limiter)]
-async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult { cmd_pic_(ctx, msg).await }
+async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_pic_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_pic")]
 async fn cmd_pic_(ctx: &Context, msg: &Message) -> CommandResult {
     let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
 
-    let res = crate::cmd::player::pic(ctx, msg, conn)
-        .instrument(tracing::info_span!("pic"))
-        .await;
+    let res = crate::cmd::player::pic(ctx, msg, conn).instrument(tracing::info_span!("pic")).await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.send_message(&ctx.http, reply).await?;
     }
@@ -191,7 +198,9 @@ async fn cmd_pic_(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Changer de photo, pour les indécis")]
 #[num_args(0)]
 #[only_in(guild)]
-async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult { cmd_change_(ctx, msg).await }
+async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_change_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_change")]
 async fn cmd_change_(ctx: &Context, msg: &Message) -> CommandResult {
@@ -231,7 +240,9 @@ async fn cmd_force_skip_(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 #[only_in(guild)]
 #[required_permissions(ADMINISTRATOR)]
-async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult { cmd_start_(ctx, msg).await }
+async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
+    cmd_start_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "cmd_start")]
 async fn cmd_start_(ctx: &Context, msg: &Message) -> CommandResult {
@@ -270,16 +281,20 @@ async fn cmd_force_win_(ctx: &Context, msg: &Message) -> CommandResult {
 #[no_help_available_text("Commande inexistante")]
 #[usage_sample_label("Exemple")]
 #[guild_only_text("Pas de DM p'tit coquin 😏")]
-#[command_not_found_text("V'là qu'il utilise une commande inexistante. Y'en a vraiment qui ont pas \
-    la lumière à tous les étages ...")]
-#[strikethrough_commands_tip_in_guild("~~`Les commandes barrées`~~ sont indispo parce qu'on avait pas envie.")]
+#[command_not_found_text(
+    "V'là qu'il utilise une commande inexistante. Y'en a vraiment qui ont pas \
+    la lumière à tous les étages ..."
+)]
+#[strikethrough_commands_tip_in_guild(
+    "~~`Les commandes barrées`~~ sont indispo parce qu'on avait pas envie."
+)]
 async fn cmd_help(
     ctx: &Context,
     msg: &Message,
     args: Args,
     help_options: &'static HelpOptions,
     groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>
+    owners: HashSet<UserId>,
 ) -> CommandResult {
     let span = tracing::info_span!("cmd_help", ?args, ?help_options, ?groups, ?owners);
     help_commands::with_embeds(ctx, msg, args, help_options, groups, owners)
@@ -289,11 +304,23 @@ async fn cmd_help(
 }
 
 #[group]
-#[commands(cmd_win, cmd_skip, cmd_show, cmd_reset, cmd_pic, cmd_force_skip, cmd_start, cmd_force_win, cmd_change)]
+#[commands(
+    cmd_win,
+    cmd_skip,
+    cmd_show,
+    cmd_reset,
+    cmd_pic,
+    cmd_force_skip,
+    cmd_start,
+    cmd_force_win,
+    cmd_change
+)]
 pub struct General;
 
 #[hook]
-pub async fn on_message(ctx: &Context, msg: &Message) { on_message_(ctx, msg).await }
+pub async fn on_message(ctx: &Context, msg: &Message) {
+    on_message_(ctx, msg).await
+}
 
 #[instrument(skip(ctx, msg), name = "on_message")]
 pub async fn on_message_(ctx: &Context, msg: &Message) {
@@ -311,13 +338,15 @@ pub async fn on_message_(ctx: &Context, msg: &Message) {
         Err(_e) => {
             // TODO raise to sentry
             msg.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
-            return
+            return;
         }
     };
 
-    let res = tokio::task::block_in_place(||
-        conn.build_transaction().serializable().run(||
-            on_participation(ctx, msg, &conn, attachment)));
+    let res = tokio::task::block_in_place(|| {
+        conn.build_transaction()
+            .serializable()
+            .run(|| on_participation(ctx, msg, &conn, attachment))
+    });
 
     if let Ok(Some(reply)) = res.handle_err(&msg.channel_id, &ctx.http).await {
         msg.channel_id.say(&ctx.http, reply).await.expect("Failed to send message");
@@ -329,25 +358,28 @@ fn on_participation(
     _ctx: &Context,
     msg: &Message,
     conn: &PgPooledConn,
-    attachment: &Attachment
+    attachment: &Attachment,
 ) -> StringResult {
     // Find game itself
     let game = msg.game(conn)?;
-    let (game, part) = match game { Some(s) => s, None => return Ok(None) };
+    let (game, part) = match game {
+        Some(s) => s,
+        None => return Ok(None),
+    };
 
     let part: Participation = if let Some(part) = part {
         // Check the participant
         if part.player_id != msg.author.id.to_string() {
             // Don't send any error message as this is annoying when people post guess pics etc
-            return Ok(None)
+            return Ok(None);
         }
 
         if part.picture_url.is_none() {
             diesel::update(&part)
-                .set(par_dsl::picture_url.eq(&attachment.proxy_url))
+                .set(participation::picture_url.eq(&attachment.proxy_url))
                 .get_result(conn)?
         } else {
-            return Err(Error::PicAlreadyPosted)
+            return Err(Error::PicAlreadyPosted);
         }
     } else {
         // Create the participation itself as nobody has a hand
@@ -356,9 +388,7 @@ fn on_participation(
             picture_url: Some(&attachment.proxy_url),
             game_id: &game.id,
         };
-        diesel::insert_into(crate::schema::participation::table)
-            .values(part)
-            .get_result(conn)?
+        diesel::insert_into(participation::table).values(part).get_result(conn)?
     };
 
     println!("Saved participation {part:?}");
@@ -374,7 +404,7 @@ async fn log_message(ctx: Context, msg: Message) {
         },
         None => "(DM)".to_owned(),
     };
-    let chan = match msg.channel_id.name(&ctx.cache).await{
+    let chan = match msg.channel_id.name(&ctx.cache).await {
         Some(name) => format!("#{name}"),
         None => "?#".to_owned(),
     };
@@ -386,10 +416,12 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         Some(id) => id.to_owned(),
         None => {
             tracing::warn!("Got react on message but bot it not cached");
-            return Ok(())
+            return Ok(());
         }
     };
-    if react.user_id == Some(bot_id) { return Ok(()) }
+    if react.user_id == Some(bot_id) {
+        return Ok(());
+    }
     let guild_id = react.guild_id.unwrap();
 
     let conn = match ctx.data.read().await.get::<PgPool>().unwrap().get() {
@@ -397,7 +429,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         Err(_e) => {
             // TODO raise to sentry
             react.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
-            return Ok(())
+            return Ok(());
         }
     };
     let game = match Game::get(&conn, guild_id.0, react.channel_id.0)? {
@@ -412,20 +444,27 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
     // bug in serenity / discord: the fetched message has guild_id set to none. override it.
     msg.guild_id = Some(guild_id);
 
-    if msg.author.id != bot_id { return Ok(()) }
-    let page = msg.embeds.get(0)
+    if msg.author.id != bot_id {
+        return Ok(());
+    }
+    let page = msg
+        .embeds
+        .get(0)
         .and_then(|embed| embed.title.as_ref())
         .filter(|title| title.contains("Scores"))
         .and_then(|title| title.split(|c| c == '(' || c == '/').nth(1))
         .and_then(|page| page.parse::<i64>().ok());
-    let page = match page { Some(page) => page, None => return Ok(()) };
+    let page = match page {
+        Some(page) => page,
+        None => return Ok(()),
+    };
 
     let page = if react.emoji == ReactionType::Unicode("➡️".to_owned()) {
         page + 1
     } else if react.emoji == ReactionType::Unicode("⬅️".to_owned()) && page > 1 {
         page - 1
     } else {
-        return Ok(())
+        return Ok(());
     };
 
     let (title, board) = match scoreboard_message(&ctx, conn, game, guild_id, page).await {

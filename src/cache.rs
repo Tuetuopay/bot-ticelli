@@ -2,7 +2,6 @@
  * Hand-made cache for users and guild members as discord's apis are doing shit
  * and the serenity cache is empty.
  */
-
 use serenity::{
     http::CacheHttp,
     model::prelude::{GuildId, Member, User, UserId},
@@ -25,7 +24,7 @@ impl Cache {
         &self,
         http: impl CacheHttp,
         guild_id: impl Into<GuildId>,
-        user_id: impl Into<UserId>
+        user_id: impl Into<UserId>,
     ) -> Result<Member> {
         let guild_id = guild_id.into();
         let user_id = user_id.into();
@@ -35,7 +34,7 @@ impl Cache {
             // Check the cache
             if let Some(member) = self.members.read().await.get(&(guild_id, user_id)) {
                 trace!("Cache hit");
-                return Ok(member.clone())
+                return Ok(member.clone());
             }
         }
 
@@ -60,7 +59,7 @@ impl Cache {
             // Check the cache
             if let Some(user) = self.users.read().await.get(&user_id) {
                 trace!("Cache hit");
-                return Ok(user.clone())
+                return Ok(user.clone());
             }
         }
 

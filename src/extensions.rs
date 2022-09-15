@@ -25,15 +25,21 @@ impl MessageExt for Message {
 }
 
 pub trait ConnectionExt {
-    fn async_transaction<T, E: From<Error>, F: Future<Output = Result<T, E>>>(&self, future: F) -> F::Output;
+    fn async_transaction<T, E: From<Error>, F: Future<Output = Result<T, E>>>(
+        &self,
+        future: F,
+    ) -> F::Output;
 }
 
 impl ConnectionExt for PgConnection {
-    fn async_transaction<T, E: From<Error>, F: Future<Output = Result<T, E>>>(&self, future: F) -> F::Output {
+    fn async_transaction<T, E: From<Error>, F: Future<Output = Result<T, E>>>(
+        &self,
+        future: F,
+    ) -> F::Output {
         tokio::task::block_in_place(|| {
-            self.build_transaction().serializable().run(|| {
-                tokio::runtime::Handle::current().block_on(future)
-            })
+            self.build_transaction()
+                .serializable()
+                .run(|| tokio::runtime::Handle::current().block_on(future))
         })
     }
 }

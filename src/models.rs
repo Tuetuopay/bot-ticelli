@@ -3,16 +3,16 @@
  */
 
 use chrono::{DateTime, Utc};
-use diesel::{prelude::*, result::Error as DError};
+use diesel::{
+    dsl::{not, now},
+    prelude::*,
+    result::Error as DError,
+};
 use serenity::model::id::UserId;
 use uuid::Uuid;
 
+pub use crate::schema::{game, participation, win};
 use crate::PgPooledConn;
-pub use crate::schema::{
-    win, win::dsl,
-    participation, participation::dsl as par_dsl,
-    game, game::dsl as game_dsl,
-};
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
 #[table_name = "win"]
@@ -50,9 +50,9 @@ pub struct Participation {
 
 impl Participation {
     pub fn get_current(conn: &PgPooledConn) -> Result<Option<Participation>, DError> {
-        let part = par_dsl::participation
-            .filter(par_dsl::is_win.eq(false))
-            .filter(par_dsl::is_skip.eq(false))
+        let part = participation::table
+            .filter(not(participation::is_win))
+            .filter(not(participation::is_skip))
             .first::<Self>(conn);
         match part {
             Ok(part) => Ok(Some(part)),
@@ -65,7 +65,7 @@ impl Participation {
 
     pub fn skip(&self, conn: &PgPooledConn) -> Result<Self, DError> {
         diesel::update(self)
-            .set((par_dsl::is_skip.eq(true), par_dsl::skipped_at.eq(diesel::dsl::now)))
+            .set((participation::is_skip.eq(true), participation::skipped_at.eq(now)))
             .get_result(conn)
     }
 
@@ -94,9 +94,9 @@ pub struct Game {
 
 impl Game {
     pub fn get(conn: &PgPooledConn, guild_id: u64, chan_id: u64) -> Result<Option<Game>, DError> {
-        game_dsl::game
-            .filter(game_dsl::guild_id.eq(guild_id.to_string()))
-            .filter(game_dsl::channel_id.eq(chan_id.to_string()))
+        game::table
+            .filter(game::guild_id.eq(guild_id.to_string()))
+            .filter(game::channel_id.eq(chan_id.to_string()))
             .first(conn)
             .optional()
     }
@@ -104,16 +104,17 @@ impl Game {
     pub fn get_with_part(
         conn: &PgPooledConn,
         guild_id: u64,
-        chan_id: u64
+        chan_id: u64,
     ) -> Result<Option<(Game, Option<Participation>)>, DError> {
-        game_dsl::game
-            .filter(game_dsl::guild_id.eq(guild_id.to_string()))
-            .filter(game_dsl::channel_id.eq(chan_id.to_string()))
-            .left_join(participation::table.on(
-                game_dsl::id.eq(par_dsl::game_id)
-                    .and(par_dsl::is_skip.eq(false))
-                    .and(par_dsl::is_win.eq(false))
-            ))
+        game::table
+            .filter(game::guild_id.eq(guild_id.to_string()))
+            .filter(game::channel_id.eq(chan_id.to_string()))
+            .left_join(
+                participation::table.on(game::id
+                    .eq(participation::game_id)
+                    .and(not(participation::is_skip))
+                    .and(not(participation::is_win))),
+            )
             .first(conn)
             .optional()
     }

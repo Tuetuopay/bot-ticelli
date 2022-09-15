@@ -2,7 +2,7 @@
  * Bot-ter-en-touche config file
  */
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -57,7 +57,6 @@ pub struct RatelimitConfig {
 pub struct TracingConfig {
     /// Where to send opentelemetry data, in Jaeger format. `<ip|hostname>:<port>`.
     pub jaeger: Option<String>,
-
     // TODO sentry, prometheus
 }
 
