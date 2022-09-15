@@ -28,6 +28,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
     };
 
     match msg.content.split(' ').collect::<Vec<_>>().as_slice() {
+        [_] => Ok(Some("Pour confirmer le reset, envoie `!reset do`.".to_owned())),
         [_, "do"] => {
             let reset_id = Uuid::new_v4();
             let win_ids = par_dsl::participation
