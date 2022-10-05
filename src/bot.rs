@@ -4,7 +4,9 @@
 
 use std::collections::HashSet;
 
-use diesel::prelude::{ExpressionMethods, RunQueryDsl};
+use diesel::prelude::ExpressionMethods;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use futures::future::FutureExt;
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
@@ -23,7 +25,7 @@ use crate::cmd::{player::scoreboard_message, StringResult};
 use crate::error::{Error, ErrorResultExt};
 use crate::extensions::*;
 use crate::models::*;
-use crate::{BotUserId, PgPool, PgPooledConn};
+use crate::BotUserId;
 
 pub struct Bot;
 
@@ -88,9 +90,13 @@ async fn cmd_skip(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_skip")]
 async fn cmd_skip_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = conn.async_transaction(crate::cmd::player::skip(ctx, msg, &conn));
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| crate::cmd::player::skip(ctx.clone(), msg.clone(), conn).boxed())
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -111,9 +117,13 @@ async fn cmd_win(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_win")]
 async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn, false));
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| crate::cmd::player::win(ctx.clone(), msg.clone(), conn, false).boxed())
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -136,10 +146,11 @@ async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_show")]
 async fn cmd_show_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res =
-        crate::cmd::player::show(ctx, msg, conn).instrument(tracing::info_span!("show")).await;
+    let res = crate::cmd::player::show(ctx.clone(), msg.clone(), &mut conn)
+        .instrument(tracing::info_span!("show"))
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         let msg = msg.channel_id.send_message(&ctx.http, reply).await?;
         msg.react(&ctx, ReactionType::Unicode("⬅️".to_owned())).await?;
@@ -162,9 +173,13 @@ async fn cmd_reset(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_reset")]
 async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = conn.async_transaction(crate::cmd::admin::reset(ctx, msg, &conn));
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| crate::cmd::admin::reset(ctx.clone(), msg.clone(), conn).boxed())
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -184,9 +199,11 @@ async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_pic")]
 async fn cmd_pic_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = crate::cmd::player::pic(ctx, msg, conn).instrument(tracing::info_span!("pic")).await;
+    let res = crate::cmd::player::pic(ctx.clone(), msg.clone(), &mut conn)
+        .instrument(tracing::info_span!("pic"))
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.send_message(&ctx.http, reply).await?;
     }
@@ -204,9 +221,9 @@ async fn cmd_change(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_change")]
 async fn cmd_change_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = crate::cmd::player::change(ctx, msg, conn).await;
+    let res = crate::cmd::player::change(ctx.clone(), msg.clone(), &mut conn).await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -225,9 +242,13 @@ async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_force_skip")]
 async fn cmd_force_skip_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = conn.async_transaction(crate::cmd::admin::force_skip(ctx, msg, &conn));
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| crate::cmd::admin::force_skip(ctx.clone(), msg.clone(), conn).boxed())
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -246,9 +267,13 @@ async fn cmd_start(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_start")]
 async fn cmd_start_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = conn.async_transaction(crate::cmd::admin::start(ctx, msg, &conn));
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| crate::cmd::admin::start(ctx.clone(), msg.clone(), conn).boxed())
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -267,9 +292,13 @@ async fn cmd_force_win(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[instrument(skip(ctx, msg), name = "cmd_force_win")]
 async fn cmd_force_win_(ctx: &Context, msg: &Message) -> CommandResult {
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get()?;
+    let mut conn = ctx.conn().await?;
 
-    let res = conn.async_transaction(crate::cmd::player::win(ctx, msg, &conn, true));
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| crate::cmd::player::win(ctx.clone(), msg.clone(), conn, true).boxed())
+        .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
     }
@@ -319,21 +348,14 @@ pub struct General;
 
 #[hook]
 pub async fn on_message(ctx: &Context, msg: &Message) {
-    on_message_(ctx, msg).await
+    on_message_(ctx.clone(), msg.clone()).await
 }
 
 #[instrument(skip(ctx, msg), name = "on_message")]
-pub async fn on_message_(ctx: &Context, msg: &Message) {
+pub async fn on_message_(ctx: Context, msg: Message) {
     tokio::spawn(log_message(ctx.clone(), msg.clone()));
 
-    // Find picture attachment
-    let attachment = match msg.attachments.iter().find(|a| a.height.is_some()) {
-        Some(att) => att,
-        None => return,
-    };
-
-    let conn = ctx.data.write().await.get_mut::<PgPool>().unwrap().get();
-    let conn = match conn {
+    let mut conn = match ctx.conn().await {
         Ok(conn) => conn,
         Err(_e) => {
             // TODO raise to sentry
@@ -342,26 +364,36 @@ pub async fn on_message_(ctx: &Context, msg: &Message) {
         }
     };
 
-    let res = tokio::task::block_in_place(|| {
-        conn.build_transaction()
-            .serializable()
-            .run(|| on_participation(ctx, msg, &conn, attachment))
-    });
+    let res = conn
+        .build_transaction()
+        .serializable()
+        .run(|conn| {
+            let msg = msg.clone();
+            async move {
+                // Find picture attachment
+                let attachment = match msg.attachments.iter().find(|a| a.height.is_some()) {
+                    Some(att) => att,
+                    None => return Ok(None),
+                };
+                on_participation(&msg, conn, attachment).await
+            }
+            .boxed()
+        })
+        .await;
 
     if let Ok(Some(reply)) = res.handle_err(&msg.channel_id, &ctx.http).await {
         msg.channel_id.say(&ctx.http, reply).await.expect("Failed to send message");
     }
 }
 
-#[instrument(skip(_ctx, msg, conn, attachment))]
-fn on_participation(
-    _ctx: &Context,
+#[instrument(skip(msg, conn, attachment))]
+async fn on_participation(
     msg: &Message,
-    conn: &PgPooledConn,
+    conn: &mut AsyncPgConnection,
     attachment: &Attachment,
 ) -> StringResult {
     // Find game itself
-    let game = msg.game(conn)?;
+    let game = msg.game(conn).await?;
     let (game, part) = match game {
         Some(s) => s,
         None => return Ok(None),
@@ -377,7 +409,8 @@ fn on_participation(
         if part.picture_url.is_none() {
             diesel::update(&part)
                 .set(participation::picture_url.eq(&attachment.proxy_url))
-                .get_result(conn)?
+                .get_result(conn)
+                .await?
         } else {
             return Err(Error::PicAlreadyPosted);
         }
@@ -388,7 +421,7 @@ fn on_participation(
             picture_url: Some(&attachment.proxy_url),
             game_id: &game.id,
         };
-        diesel::insert_into(participation::table).values(part).get_result(conn)?
+        diesel::insert_into(participation::table).values(part).get_result(conn).await?
     };
 
     println!("Saved participation {part:?}");
@@ -424,7 +457,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
     }
     let guild_id = react.guild_id.unwrap();
 
-    let conn = match ctx.data.read().await.get::<PgPool>().unwrap().get() {
+    let mut conn = match ctx.conn().await {
         Ok(conn) => conn,
         Err(_e) => {
             // TODO raise to sentry
@@ -432,7 +465,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
             return Ok(());
         }
     };
-    let game = match Game::get(&conn, guild_id.0, react.channel_id.0)? {
+    let game = match Game::get(&mut conn, guild_id.0, react.channel_id.0).await? {
         Some(game) => game,
         None => return Ok(()),
     };
@@ -467,7 +500,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         return Ok(());
     };
 
-    let (title, board) = match scoreboard_message(&ctx, conn, game, guild_id, page).await {
+    let (title, board) = match scoreboard_message(&ctx, &mut conn, game, guild_id, page).await {
         Ok(res) => res,
         Err(Error::InvalidPage) => return Ok(()),
         Err(e) => return Err(e),

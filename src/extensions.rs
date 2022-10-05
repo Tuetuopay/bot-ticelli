@@ -2,44 +2,34 @@
  * Extensions to some builtin or external types
  */
 
-use std::future::Future;
-
-use diesel::{pg::PgConnection, result::Error};
+use async_trait::async_trait;
+use diesel::result::Error;
+use diesel_async::{
+    pooled_connection::deadpool::{Object, Pool, PoolError},
+    AsyncPgConnection,
+};
 use serenity::{client::Context, model::prelude::Message};
 
 use crate::cache::Cache;
-use crate::models::*;
-use crate::PgPooledConn;
+use crate::{models::*, PgPool};
 
+#[async_trait]
 pub trait MessageExt {
-    fn game(&self, conn: &PgPooledConn) -> Result<Option<(Game, Option<Participation>)>, Error>;
+    async fn game(
+        &self,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Option<(Game, Option<Participation>)>, Error>;
 }
 
+#[async_trait]
 impl MessageExt for Message {
-    fn game(&self, conn: &PgPooledConn) -> Result<Option<(Game, Option<Participation>)>, Error> {
+    async fn game(
+        &self,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Option<(Game, Option<Participation>)>, Error> {
         Ok(match self.guild_id {
-            Some(id) => Game::get_with_part(conn, *id.as_u64(), *self.channel_id.as_u64())?,
+            Some(id) => Game::get_with_part(conn, *id.as_u64(), *self.channel_id.as_u64()).await?,
             None => None,
-        })
-    }
-}
-
-pub trait ConnectionExt {
-    fn async_transaction<T, E: From<Error>, F: Future<Output = Result<T, E>>>(
-        &self,
-        future: F,
-    ) -> F::Output;
-}
-
-impl ConnectionExt for PgConnection {
-    fn async_transaction<T, E: From<Error>, F: Future<Output = Result<T, E>>>(
-        &self,
-        future: F,
-    ) -> F::Output {
-        tokio::task::block_in_place(|| {
-            self.build_transaction()
-                .serializable()
-                .run(|| tokio::runtime::Handle::current().block_on(future))
         })
     }
 }
@@ -47,11 +37,19 @@ impl ConnectionExt for PgConnection {
 #[serenity::async_trait]
 pub trait ContextExt {
     async fn cache(&self) -> Cache;
+    async fn pool(&self) -> Pool<AsyncPgConnection>;
+    async fn conn(&self) -> Result<Object<AsyncPgConnection>, PoolError>;
 }
 
 #[serenity::async_trait]
 impl ContextExt for Context {
     async fn cache(&self) -> Cache {
         self.data.read().await.get::<Cache>().unwrap().clone()
+    }
+    async fn pool(&self) -> Pool<AsyncPgConnection> {
+        self.data.read().await.get::<PgPool>().unwrap().clone()
+    }
+    async fn conn(&self) -> Result<Object<AsyncPgConnection>, PoolError> {
+        self.pool().await.get().await
     }
 }

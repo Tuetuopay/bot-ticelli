@@ -4,8 +4,10 @@
 
 use diesel::{
     dsl::{not, now, sql},
-    prelude::{ExpressionMethods, GroupByDsl, QueryDsl, RunQueryDsl},
+    prelude::{ExpressionMethods, QueryDsl},
+    sql_types::BigInt,
 };
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use rand::seq::SliceRandom;
 use serenity::{
     client::Context,
@@ -19,11 +21,10 @@ use crate::error::Error;
 use crate::extensions::{ContextExt, MessageExt};
 use crate::models::*;
 use crate::paginate::*;
-use crate::PgPooledConn;
 
 #[instrument(skip(_ctx, msg, conn))]
-pub async fn skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
-    let game = msg.game(conn)?;
+pub async fn skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+    let game = msg.game(conn).await?;
 
     let part = match game {
         Some((_, Some(part))) => part,
@@ -35,7 +36,7 @@ pub async fn skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringR
         return Err(Error::NotYourTurn);
     }
 
-    part.skip(conn)?;
+    part.skip(conn).await?;
 
     Ok(Some(
         MessageBuilder::new()
@@ -47,8 +48,13 @@ pub async fn skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringR
 }
 
 #[instrument(skip(ctx, msg, conn))]
-pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool) -> StringResult {
-    let game = msg.game(conn)?;
+pub async fn win(
+    ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+    force: bool,
+) -> StringResult {
+    let game = msg.game(conn).await?;
     let (game, part) = match game {
         Some((game, Some(part))) => (game, part),
         Some(_) => return Err(Error::NoParticipant),
@@ -101,7 +107,7 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
     // Save the win
     let win =
         NewWin { player_id: &msg.author.id.0.to_string(), winner_id: &winner.id.0.to_string() };
-    let win: Win = diesel::insert_into(win::table).values(win).get_result(conn)?;
+    let win: Win = diesel::insert_into(win::table).values(win).get_result(conn).await?;
     println!("Saved win {win:?}");
 
     // Mark participation as won
@@ -111,13 +117,15 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
             participation::won_at.eq(now),
             participation::win_id.eq(&win.id),
         ))
-        .execute(conn)?;
+        .execute(conn)
+        .await?;
 
     // Mark winner as new participant
     let part = NewParticipation { player_id: &win.winner_id, picture_url: None, game_id: &game.id };
     diesel::insert_into(participation::table)
         .values(part)
-        .get_result::<Participation>(conn)?;
+        .get_result::<Participation>(conn)
+        .await?;
 
     let def = vec![];
     let data = ctx.data.read().await;
@@ -137,8 +145,9 @@ pub async fn win(ctx: &Context, msg: &Message, conn: &PgPooledConn, force: bool)
     Ok(Some(MessageBuilder::new().push(left).mention(winner).push(right).build()))
 }
 
-pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMessageResult {
-    let game = msg.game(&conn)?;
+pub async fn show(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> CreateMessageResult {
+    tracing::info!("Show command invoked");
+    let game = msg.game(conn).await?;
     let game = match game {
         Some((game, _)) => game,
         None => return Ok(None),
@@ -149,14 +158,14 @@ pub async fn show(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMes
         return Err(Error::InvalidPage);
     }
 
-    let (title, board) = scoreboard_message(ctx, conn, game, msg.guild_id.unwrap(), page).await?;
+    let (title, board) = scoreboard_message(&ctx, conn, game, msg.guild_id.unwrap(), page).await?;
 
     Ok(Some(Box::new(move |m| m.embed(|e| e.title(title).colour(Colour::GOLD).fields(board)))))
 }
 
 pub async fn scoreboard_message(
     ctx: &Context,
-    conn: PgPooledConn,
+    conn: &mut AsyncPgConnection,
     game: Game,
     guild: GuildId,
     page: i64,
@@ -164,21 +173,21 @@ pub async fn scoreboard_message(
     let per_page = 10;
 
     let (wins, count) = win::table
-        .select((sql("count(win.id) as cnt"), win::winner_id))
+        .select((sql::<BigInt>("count(win.id) as cnt"), win::winner_id))
         .filter(not(win::reset))
         .inner_join(participation::table)
         .filter(participation::game_id.eq(&game.id))
         .group_by(win::winner_id)
-        .order_by(sql::<diesel::sql_types::BigInt>("cnt").desc())
+        .order_by(sql::<BigInt>("cnt").desc())
         .paginate(page)
         .per_page(per_page)
-        .load_and_count::<_, (i64, String)>(&conn)?;
+        .load_and_count::<(i64, String)>(conn)
+        .await?;
     let page_count = count / per_page + 1;
 
     if page > page_count {
         return Err(Error::InvalidPage);
     }
-
 
     let cache = ctx.cache().await;
     let board = wins
@@ -221,8 +230,8 @@ pub async fn scoreboard_message(
 }
 
 //#[instrument(skip(ctx, msg, conn))]
-pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMessageResult {
-    let game = msg.game(&conn)?;
+pub async fn pic(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> CreateMessageResult {
+    let game = msg.game(conn).await?;
     let part = match game {
         Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
@@ -258,8 +267,8 @@ pub async fn pic(ctx: &Context, msg: &Message, conn: PgPooledConn) -> CreateMess
 }
 
 #[instrument(skip(_ctx, msg, conn))]
-pub async fn change(_ctx: &Context, msg: &Message, conn: PgPooledConn) -> StringResult {
-    let game = msg.game(&conn)?;
+pub async fn change(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+    let game = msg.game(conn).await?;
 
     let part = match game {
         Some((_, Some(part))) => part,
@@ -273,7 +282,8 @@ pub async fn change(_ctx: &Context, msg: &Message, conn: PgPooledConn) -> String
 
     diesel::update(&part)
         .set(participation::picture_url.eq(Option::<String>::None))
-        .execute(&conn)?;
+        .execute(conn)
+        .await?;
 
     Ok(Some("Ok, ok, puisque t'insistes ...".to_owned()))
 }

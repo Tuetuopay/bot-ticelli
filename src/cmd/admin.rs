@@ -4,9 +4,10 @@
 
 use chrono::{DateTime, Utc};
 use diesel::{
-    dsl::{any, not, now, sql},
-    prelude::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl},
+    dsl::{not, now, sql},
+    prelude::{ExpressionMethods, OptionalExtension, QueryDsl},
 };
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use itertools::Itertools;
 use serenity::{client::Context, model::prelude::Message, utils::MessageBuilder};
 use tracing::info;
@@ -16,11 +17,11 @@ use super::*;
 use crate::error::Error;
 use crate::extensions::MessageExt;
 use crate::models::*;
-use crate::PgPooledConn;
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
-pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
-    let game = msg.game(conn)?;
+pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+    tracing::info!("in reset handler");
+    let game = msg.game(conn).await?;
     let (game, part) = match game {
         Some((game, part)) => (game, part),
         None => return Ok(None),
@@ -34,17 +35,19 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 .filter(participation::is_win)
                 .filter(participation::game_id.eq(&game.id))
                 .select(participation::win_id)
-                .load::<Option<Uuid>>(conn)?
+                .load::<Option<Uuid>>(conn)
+                .await?
                 .into_iter()
                 .flatten()
                 .collect::<Vec<_>>();
-            diesel::update(win::table.filter(not(win::reset)).filter(win::id.eq(any(win_ids))))
+            diesel::update(win::table.filter(not(win::reset)).filter(win::id.eq_any(win_ids)))
                 .set((win::reset.eq(true), win::reset_at.eq(now), win::reset_id.eq(reset_id)))
-                .execute(conn)?;
+                .execute(conn)
+                .await?;
 
             // Mark the current participation as skipped (if any)
             if let Some(part) = part {
-                part.skip(conn)?;
+                part.skip(conn).await?;
             }
 
             Ok(Some(format!("Scores reset avec ID {reset_id}")))
@@ -56,9 +59,10 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                 .inner_join(participation::table)
                 .filter(participation::game_id.eq(&game.id))
                 .filter(win::reset)
-                .filter(sql("true group by reset_id"))
+                .group_by(win::reset_id)
                 .order_by(sql::<Timestamptz>("rst"))
-                .load::<(Option<Uuid>, DateTime<Utc>)>(conn)?
+                .load::<(Option<Uuid>, DateTime<Utc>)>(conn)
+                .await?
                 .into_iter()
                 .enumerate()
                 .filter_map(|(i, (id, at))| id.map(|id| format!("{}. {id} à {at}", i + 1)))
@@ -74,6 +78,7 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
                     win::reset_id.eq::<Option<Uuid>>(None),
                 ))
                 .execute(conn)
+                .await
                 .optional()?
                 .ok_or(Error::InvalidResetId)?;
             Ok(Some(format!("Reset {reset_id} annulé")))
@@ -83,15 +88,15 @@ pub async fn reset(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
 }
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
-pub async fn force_skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
-    let game = msg.game(conn)?;
+pub async fn force_skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+    let game = msg.game(conn).await?;
     let part = match game {
         Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
         None => return Ok(None),
     };
 
-    part.skip(conn)?;
+    part.skip(conn).await?;
 
     Ok(Some(
         MessageBuilder::new()
@@ -103,8 +108,8 @@ pub async fn force_skip(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> S
 }
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
-pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> StringResult {
-    let game = msg.game(conn)?;
+pub async fn start(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+    let game = msg.game(conn).await?;
 
     if game.is_some() {
         return Ok(Some("Il y a déjà une partie en cours dans ce chan".to_owned()));
@@ -120,7 +125,7 @@ pub async fn start(_ctx: &Context, msg: &Message, conn: &PgPooledConn) -> String
         channel_id: &msg.channel_id.to_string(),
         creator_id: &msg.author.id.to_string(),
     };
-    let game: Game = diesel::insert_into(game::table).values(game).get_result(conn)?;
+    let game: Game = diesel::insert_into(game::table).values(game).get_result(conn).await?;
     info!("Created new game: {game:?}");
 
     Ok(Some("Partie démarrée !".to_owned()))

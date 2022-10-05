@@ -8,14 +8,14 @@ use diesel::{
     prelude::*,
     result::Error as DError,
 };
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use serenity::model::id::UserId;
 use uuid::Uuid;
 
 pub use crate::schema::{game, participation, win};
-use crate::PgPooledConn;
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
-#[table_name = "win"]
+#[diesel(table_name = win)]
 pub struct Win {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
@@ -27,14 +27,14 @@ pub struct Win {
 }
 
 #[derive(Insertable, Debug, Clone)]
-#[table_name = "win"]
+#[diesel(table_name = win)]
 pub struct NewWin<'a> {
     pub player_id: &'a str,
     pub winner_id: &'a str,
 }
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
-#[table_name = "participation"]
+#[diesel(table_name = participation)]
 pub struct Participation {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
@@ -49,11 +49,14 @@ pub struct Participation {
 }
 
 impl Participation {
-    pub fn get_current(conn: &PgPooledConn) -> Result<Option<Participation>, DError> {
+    pub async fn get_current(
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Option<Participation>, DError> {
         let part = participation::table
             .filter(not(participation::is_win))
             .filter(not(participation::is_skip))
-            .first::<Self>(conn);
+            .first::<Self>(conn)
+            .await;
         match part {
             Ok(part) => Ok(Some(part)),
             Err(e) => match e {
@@ -63,10 +66,11 @@ impl Participation {
         }
     }
 
-    pub fn skip(&self, conn: &PgPooledConn) -> Result<Self, DError> {
+    pub async fn skip(&self, conn: &mut AsyncPgConnection) -> Result<Self, DError> {
         diesel::update(self)
             .set((participation::is_skip.eq(true), participation::skipped_at.eq(now)))
             .get_result(conn)
+            .await
     }
 
     pub fn player(&self) -> UserId {
@@ -75,7 +79,7 @@ impl Participation {
 }
 
 #[derive(Insertable, Debug, Clone)]
-#[table_name = "participation"]
+#[diesel(table_name = participation)]
 pub struct NewParticipation<'a> {
     pub player_id: &'a str,
     pub picture_url: Option<&'a str>,
@@ -83,7 +87,7 @@ pub struct NewParticipation<'a> {
 }
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
-#[table_name = "game"]
+#[diesel(table_name = game)]
 pub struct Game {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
@@ -93,16 +97,21 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn get(conn: &PgPooledConn, guild_id: u64, chan_id: u64) -> Result<Option<Game>, DError> {
+    pub async fn get(
+        conn: &mut AsyncPgConnection,
+        guild_id: u64,
+        chan_id: u64,
+    ) -> Result<Option<Game>, DError> {
         game::table
             .filter(game::guild_id.eq(guild_id.to_string()))
             .filter(game::channel_id.eq(chan_id.to_string()))
             .first(conn)
+            .await
             .optional()
     }
 
-    pub fn get_with_part(
-        conn: &PgPooledConn,
+    pub async fn get_with_part(
+        conn: &mut AsyncPgConnection,
         guild_id: u64,
         chan_id: u64,
     ) -> Result<Option<(Game, Option<Participation>)>, DError> {
@@ -116,12 +125,13 @@ impl Game {
                     .and(not(participation::is_win))),
             )
             .first(conn)
+            .await
             .optional()
     }
 }
 
 #[derive(Insertable, Debug, Clone)]
-#[table_name = "game"]
+#[diesel(table_name = game)]
 pub struct NewGame<'a> {
     pub guild_id: &'a str,
     pub channel_id: &'a str,

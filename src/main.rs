@@ -2,9 +2,9 @@
 extern crate diesel;
 
 use clap::Parser;
-use diesel::{
-    r2d2::{ConnectionManager, Pool, PooledConnection},
-    PgConnection,
+use diesel_async::{
+    pg::AsyncPgConnection,
+    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
 };
 use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
 use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
@@ -25,9 +25,8 @@ use cache::Cache;
 
 struct PgPool;
 impl TypeMapKey for PgPool {
-    type Value = Pool<ConnectionManager<PgConnection>>;
+    type Value = Pool<AsyncPgConnection>;
 }
-pub type PgPooledConn = PooledConnection<ConnectionManager<PgConnection>>;
 
 struct WinSentences;
 impl TypeMapKey for WinSentences {
@@ -58,8 +57,8 @@ async fn main() {
     if let Some(ref tracing) = config.tracing_config {
         if let Some(ref jaeger) = tracing.jaeger {
             let tags = vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))];
-            let tracer = opentelemetry_jaeger::new_pipeline()
-                .with_agent_endpoint(jaeger)
+            let tracer = opentelemetry_jaeger::new_agent_pipeline()
+                .with_endpoint(jaeger)
                 .with_service_name("bot-ticelli")
                 .with_trace_config(Config::default().with_resource(Resource::new(tags)))
                 .install_simple()
@@ -77,8 +76,9 @@ async fn main() {
 
     // Connect to database
     tracing::info!("Connecting to postgres...");
-    let manager = ConnectionManager::<PgConnection>::new(&config.db_config.database_url);
-    let pool = Pool::builder().build(manager).expect("Failed to create connection pool");
+    let manager =
+        AsyncDieselConnectionManager::<AsyncPgConnection>::new(&config.db_config.database_url);
+    let pool = Pool::builder(manager).build().expect("Failed to create connection pool");
 
     // Create client instance
     tracing::info!("Connecting to discord...");

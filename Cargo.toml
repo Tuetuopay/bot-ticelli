@@ -7,20 +7,21 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 chrono = "0.4"
-clap = { version = "3", features = ["derive"] }
-diesel = { version = "1.4", features = ["r2d2", "postgres", "uuidv07", "chrono"] }
+clap = { version = "4", features = ["derive"] }
+diesel = { version = "2", default-features = false, features = ["postgres", "uuid", "chrono"] }
+diesel-async = { version = "0.1", features = ["postgres", "deadpool"] }
 futures = "0.3"
 itertools = "0.10"
-opentelemetry = "0.17"
-opentelemetry-jaeger = "0.16"
+opentelemetry = "0.18"
+opentelemetry-jaeger = "0.17"
 rand = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 toml = "0.5"
 tracing = "0.1"
 tracing-futures = "0.2"
-tracing-opentelemetry = "0.17"
+tracing-opentelemetry = "0.18"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = "1.0"
 serde_derive = "1.0"
 serenity = "0.11"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
