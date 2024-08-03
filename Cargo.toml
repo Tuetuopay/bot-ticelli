@@ -1,6 +1,6 @@
 [package]
 name = "bot-ticelli"
-version = "1.4.0"
+version = "1.4.1"
 authors = ["Tuetuopay <tuetuopay@me.com>"]
 edition = "2021"
 
