@@ -38,6 +38,7 @@ impl TypeMapKey for BotUserId {
     type Value = UserId;
 }
 
+/// A small Discord bot for managing picture-guessing games.
 #[derive(Parser, Debug)]
 #[clap(author, version)]
 struct Args {
