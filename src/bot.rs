@@ -235,7 +235,7 @@ async fn cmd_change_(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Force la main à passer")]
 #[num_args(0)]
 #[only_in(guild)]
-#[required_permissions(ADMINISTRATOR)]
+#[required_permissions(KICK_MEMBERS)]
 async fn cmd_force_skip(ctx: &Context, msg: &Message) -> CommandResult {
     cmd_force_skip_(ctx, msg).await
 }
@@ -285,7 +285,7 @@ async fn cmd_start_(ctx: &Context, msg: &Message) -> CommandResult {
 #[description("Force une victoire d'un joueur")]
 #[num_args(1)]
 #[only_in(guild)]
-#[required_permissions(ADMINISTRATOR)]
+#[required_permissions(KICK_MEMBERS)]
 async fn cmd_force_win(ctx: &Context, msg: &Message) -> CommandResult {
     cmd_force_win_(ctx, msg).await
 }
