@@ -31,12 +31,12 @@ pub struct DbConfig {
 pub struct BotConfig {
     /// Discord command prefix
     pub command_prefix: String,
-
     /// Sentences to use on win
     pub win_sentences: Vec<String>,
-
     /// Command ratelimiting
     pub ratelimit: Option<RatelimitConfig>,
+    /// Automatic picture skipping
+    pub auto_skip: Option<AutoskipConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -44,12 +44,19 @@ pub struct BotConfig {
 pub struct RatelimitConfig {
     /// The "break" time, in seconds, between invocations of a command.
     pub delay: Option<u64>,
-
     /// How long, in seconds, the ratelimit will apply for
     pub time_span: Option<u64>,
-
     /// Number of invocations allowed per `time_span`
     pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct AutoskipConfig {
+    /// Delay for auto-skipping pictures, in seconds.
+    pub autoskip_delay: u32,
+    /// Delay before warning the picture will be auto-skipped, in seconds.
+    pub warn_delay: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

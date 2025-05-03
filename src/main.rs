@@ -8,12 +8,14 @@ use diesel_async::{
 };
 use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
 use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
+use tokio::spawn;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod bot;
 mod cache;
 mod cmd;
 mod config;
+mod cron;
 mod error;
 mod extensions;
 mod models;
@@ -115,11 +117,15 @@ async fn main() {
     let mut client = Client::builder(&config.auth.token, intents)
         .event_handler(Bot)
         .framework(framework)
-        .type_map_insert::<PgPool>(pool)
+        .type_map_insert::<PgPool>(pool.clone())
         .type_map_insert::<WinSentences>(config.bot_config.win_sentences)
         .type_map_insert::<Cache>(Cache::default())
         .await
         .expect("Failed to create discord client");
+
+    if let Some(autoskip) = config.bot_config.auto_skip {
+        spawn(cron::task_auto_skip(client.cache_and_http.http.clone(), pool, autoskip));
+    }
 
     tracing::info!("Runing app...");
     client.start().await.expect("Client error")

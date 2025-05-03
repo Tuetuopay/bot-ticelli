@@ -12,5 +12,9 @@ win-sentences = [
 ]
 ratelimit = { delay = 5, time-span = 30, limit = 4 }
 
+[bot-config.auto-skip]
+autoskip-delay = 600
+warn-delay = 300
+
 [tracing-config]
 jaeger = "localhost:6831"

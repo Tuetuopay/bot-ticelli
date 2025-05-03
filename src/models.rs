@@ -9,7 +9,7 @@ use diesel::{
     result::Error as DError,
 };
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use serenity::model::id::UserId;
+use serenity::model::id::{ChannelId, UserId};
 use uuid::Uuid;
 
 pub use crate::schema::{game, participation, win};
@@ -24,6 +24,7 @@ pub struct Win {
     pub reset: bool,
     pub reset_at: Option<DateTime<Utc>>,
     pub reset_id: Option<Uuid>,
+    pub score: i32,
 }
 
 #[derive(Insertable, Debug, Clone)]
@@ -31,6 +32,7 @@ pub struct Win {
 pub struct NewWin<'a> {
     pub player_id: &'a str,
     pub winner_id: &'a str,
+    pub score: i32,
 }
 
 #[derive(Queryable, Identifiable, Debug, Clone)]
@@ -46,6 +48,7 @@ pub struct Participation {
     pub skipped_at: Option<DateTime<Utc>>,
     pub picture_url: Option<String>,
     pub game_id: Uuid,
+    pub warned_at: Option<DateTime<Utc>>,
 }
 
 impl Participation {
@@ -127,6 +130,10 @@ impl Game {
             .first(conn)
             .await
             .optional()
+    }
+
+    pub fn channel(&self) -> ChannelId {
+        ChannelId(self.channel_id.parse().unwrap())
     }
 }
 

@@ -20,6 +20,7 @@ table! {
         skipped_at -> Nullable<Timestamptz>,
         picture_url -> Nullable<Text>,
         game_id -> Uuid,
+        warned_at -> Nullable<Timestamptz>,
     }
 }
 
@@ -32,6 +33,7 @@ table! {
         reset -> Bool,
         reset_at -> Nullable<Timestamptz>,
         reset_id -> Nullable<Uuid>,
+        score -> Int4,
     }
 }
 
