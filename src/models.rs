@@ -49,6 +49,7 @@ pub struct Participation {
     pub picture_url: Option<String>,
     pub game_id: Uuid,
     pub warned_at: Option<DateTime<Utc>>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Participation {

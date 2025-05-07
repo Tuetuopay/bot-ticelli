@@ -43,8 +43,8 @@ async fn try_task_auto_skip(
         .filter(not(participation::is_win))
         .filter(not(participation::is_skip))
         .filter(participation::warned_at.is_null())
-        .filter((participation::created_at + autoskip_delay - warn_delay).le(now))
-        .filter((participation::created_at + autoskip_delay).gt(now))
+        .filter((participation::updated_at + autoskip_delay - warn_delay).le(now))
+        .filter((participation::updated_at + autoskip_delay).gt(now))
         .inner_join(game::table)
         .load::<(Participation, Game)>(&mut conn)
         .await?;
@@ -62,7 +62,7 @@ async fn try_task_auto_skip(
     let parts = participation::table
         .filter(not(participation::is_win))
         .filter(not(participation::is_skip))
-        .filter((participation::created_at + autoskip_delay).le(now))
+        .filter((participation::updated_at + autoskip_delay).le(now))
         .inner_join(game::table)
         .load::<(Participation, Game)>(&mut conn)
         .await?;

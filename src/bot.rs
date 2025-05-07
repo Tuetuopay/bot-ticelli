@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use diesel::prelude::ExpressionMethods;
+use diesel::{dsl::now, prelude::ExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use futures::future::FutureExt;
 use serenity::{
@@ -408,7 +408,10 @@ async fn on_participation(
 
         if part.picture_url.is_none() {
             diesel::update(&part)
-                .set(participation::picture_url.eq(&attachment.proxy_url))
+                .set((
+                    participation::picture_url.eq(&attachment.proxy_url),
+                    participation::updated_at.eq(now),
+                ))
                 .get_result(conn)
                 .await?
         } else {

@@ -284,7 +284,10 @@ pub async fn change(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -
     }
 
     diesel::update(&part)
-        .set(participation::picture_url.eq(Option::<String>::None))
+        .set((
+            participation::picture_url.eq(Option::<String>::None),
+            participation::updated_at.eq(now),
+        ))
         .execute(conn)
         .await?;
 

@@ -21,6 +21,7 @@ table! {
         picture_url -> Nullable<Text>,
         game_id -> Uuid,
         warned_at -> Nullable<Timestamptz>,
+        updated_at -> Timestamptz,
     }
 }
 
