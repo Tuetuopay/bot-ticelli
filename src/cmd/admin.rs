@@ -47,7 +47,7 @@ pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) ->
 
             // Mark the current participation as skipped (if any)
             if let Some(part) = part {
-                part.skip(conn).await?;
+                part.skip(conn, false).await?;
             }
 
             Ok(Some(format!("Scores reset avec ID {reset_id}")))
@@ -96,7 +96,7 @@ pub async fn force_skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnectio
         None => return Ok(None),
     };
 
-    part.skip(conn).await?;
+    part.skip(conn, true).await?;
 
     Ok(Some(
         MessageBuilder::new()

@@ -10,6 +10,7 @@ use diesel::{
 };
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use serenity::model::id::{ChannelId, UserId};
+use tracing::info;
 use uuid::Uuid;
 
 pub use crate::schema::{game, participation, win};
@@ -70,9 +71,21 @@ impl Participation {
         }
     }
 
-    pub async fn skip(&self, conn: &mut AsyncPgConnection) -> Result<Self, DError> {
+    pub async fn skip(&self, conn: &mut AsyncPgConnection, negative: bool) -> Result<Self, DError> {
+        let win_id = if negative {
+            let win = NewWin { player_id: &self.player_id, winner_id: &self.player_id, score: -1 };
+            let win = diesel::insert_into(win::table).values(win).get_result::<Win>(conn).await?;
+            info!("Saved (negative) win {win:?}");
+            Some(win.id)
+        } else {
+            None
+        };
         diesel::update(self)
-            .set((participation::is_skip.eq(true), participation::skipped_at.eq(now)))
+            .set((
+                participation::is_skip.eq(true),
+                participation::skipped_at.eq(now),
+                participation::win_id.eq(win_id),
+            ))
             .get_result(conn)
             .await
     }

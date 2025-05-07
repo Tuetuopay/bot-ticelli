@@ -11,7 +11,7 @@ use tracing::{error, info, instrument};
 use crate::{
     config::AutoskipConfig,
     error::Result,
-    models::{game, participation, win, Game, NewWin, Participation, Win},
+    models::{game, participation, Game, Participation},
 };
 
 pub async fn task_auto_skip(
@@ -67,21 +67,8 @@ async fn try_task_auto_skip(
         .load::<(Participation, Game)>(&mut conn)
         .await?;
     for (part, game) in parts {
-        part.skip(&mut conn).await?;
-        let win = NewWin { player_id: &part.player_id, winner_id: &part.player_id, score: -1 };
-        let win = diesel::insert_into(win::table).values(win).get_result::<Win>(&mut conn).await?;
-
-        diesel::update(&part)
-            .set((
-                participation::is_skip.eq(true),
-                participation::skipped_at.eq(now),
-                // Record negative win
-                participation::win_id.eq(win.id),
-            ))
-            .execute(&mut conn)
-            .await?;
-
-        info!("Saved (negative) win {win:?}");
+        info!("Auto-skipping participation {part:?}");
+        part.skip(&mut conn, true).await?;
 
         let m = MessageBuilder::new()
             .push("Sorry ")

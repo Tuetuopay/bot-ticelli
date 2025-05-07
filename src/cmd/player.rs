@@ -35,7 +35,7 @@ pub async fn skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> 
         return Err(Error::NotYourTurn);
     }
 
-    part.skip(conn).await?;
+    part.skip(conn, true).await?;
 
     Ok(Some(
         MessageBuilder::new()
