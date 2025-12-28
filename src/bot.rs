@@ -6,7 +6,6 @@ use std::collections::HashSet;
 
 use diesel::{dsl::now, prelude::ExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use futures::future::FutureExt;
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
@@ -30,7 +29,7 @@ use crate::{
 
 pub struct Bot;
 
-#[serenity::async_trait]
+#[async_trait::async_trait]
 impl EventHandler for Bot {
     async fn ready(&self, ctx: Context, data: serenity::model::gateway::Ready) {
         ctx.data.write().await.insert::<BotUserId>(data.user.id);
@@ -96,7 +95,7 @@ async fn cmd_skip_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| crate::cmd::player::skip(ctx.clone(), msg.clone(), conn).boxed())
+        .run(|conn| Box::pin(crate::cmd::player::skip(ctx.clone(), msg.clone(), conn)))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -123,7 +122,7 @@ async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| crate::cmd::player::win(ctx.clone(), msg.clone(), conn, false).boxed())
+        .run(|conn| Box::pin(crate::cmd::player::win(ctx.clone(), msg.clone(), conn, false)))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -179,7 +178,7 @@ async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| crate::cmd::admin::reset(ctx.clone(), msg.clone(), conn).boxed())
+        .run(|conn| Box::pin(crate::cmd::admin::reset(ctx.clone(), msg.clone(), conn)))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -248,7 +247,7 @@ async fn cmd_force_skip_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| crate::cmd::admin::force_skip(ctx.clone(), msg.clone(), conn).boxed())
+        .run(|conn| Box::pin(crate::cmd::admin::force_skip(ctx.clone(), msg.clone(), conn)))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -273,7 +272,7 @@ async fn cmd_start_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| crate::cmd::admin::start(ctx.clone(), msg.clone(), conn).boxed())
+        .run(|conn| Box::pin(crate::cmd::admin::start(ctx.clone(), msg.clone(), conn)))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -298,7 +297,7 @@ async fn cmd_force_win_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| crate::cmd::player::win(ctx.clone(), msg.clone(), conn, true).boxed())
+        .run(|conn| Box::pin(crate::cmd::player::win(ctx.clone(), msg.clone(), conn, true)))
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -369,16 +368,14 @@ pub async fn on_message_(ctx: Context, msg: Message) {
         .build_transaction()
         .serializable()
         .run(|conn| {
-            let msg = msg.clone();
-            async move {
+            Box::pin(async {
                 // Find picture attachment
                 let attachment = match msg.attachments.iter().find(|a| a.height.is_some()) {
                     Some(att) => att,
                     None => return Ok(None),
                 };
                 on_participation(&msg, conn, attachment).await
-            }
-            .boxed()
+            })
         })
         .await;
 
@@ -490,7 +487,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         .and_then(|embed| embed.title.as_ref())
         .filter(|title| title.contains("Scores"))
         .and_then(|title| title.split(|c| c == '(' || c == '/').nth(1))
-        .and_then(|page| page.parse::<i64>().ok());
+        .and_then(|page| page.parse::<usize>().ok());
     let page = match page {
         Some(page) => page,
         None => return Ok(()),

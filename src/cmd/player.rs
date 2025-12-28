@@ -20,7 +20,6 @@ use crate::{
     error::Error,
     extensions::{ContextExt, MessageExt},
     models::*,
-    paginate::*,
 };
 
 #[instrument(skip(_ctx, msg, conn))]
@@ -172,22 +171,20 @@ pub async fn scoreboard_message(
     conn: &mut AsyncPgConnection,
     game: Game,
     guild: GuildId,
-    page: i64,
+    page: usize,
 ) -> Result<(String, Vec<(String, i64, bool)>)> {
-    let per_page = 10;
-
-    let (wins, count) = win::table
+    let wins = win::table
         .group_by(win::winner_id)
         .select((sum(win::score), win::winner_id))
         .filter(not(win::reset))
         .inner_join(participation::table)
         .filter(participation::game_id.eq(&game.id))
         .order_by(sum(win::score).desc())
-        .paginate(page)
-        .per_page(per_page)
-        .load_and_count::<(Option<i64>, String)>(conn)
+        .load::<(Option<i64>, String)>(conn)
         .await?;
-    let page_count = count / per_page + 1;
+
+    let per_page = 10;
+    let page_count = wins.len() / per_page + 1;
 
     if page > page_count {
         return Err(Error::InvalidPage);
@@ -196,6 +193,8 @@ pub async fn scoreboard_message(
     let cache = ctx.cache().await;
     let board = wins
         .into_iter()
+        .skip((page - 1) * per_page)
+        .take(per_page)
         .filter_map(|(score, id)| Some((score?, id)))
         .map(|(score, id)| (score, id.parse::<u64>().unwrap(), cache.clone(), info_span!("map_fn")))
         .enumerate()

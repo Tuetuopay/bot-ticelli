@@ -20,7 +20,6 @@ mod cron;
 mod error;
 mod extensions;
 mod models;
-mod paginate;
 mod schema;
 
 use bot::Bot;
