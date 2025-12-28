@@ -355,13 +355,10 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 pub async fn on_message_(ctx: Context, msg: Message) {
     tokio::spawn(log_message(ctx.clone(), msg.clone()));
 
-    let mut conn = match ctx.conn().await {
-        Ok(conn) => conn,
-        Err(_e) => {
-            // TODO raise to sentry
-            msg.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
-            return;
-        }
+    let Ok(mut conn) = ctx.conn().await else {
+        // TODO raise to sentry
+        msg.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
+        return;
     };
 
     let res = conn
@@ -370,9 +367,8 @@ pub async fn on_message_(ctx: Context, msg: Message) {
         .run(|conn| {
             Box::pin(async {
                 // Find picture attachment
-                let attachment = match msg.attachments.iter().find(|a| a.height.is_some()) {
-                    Some(att) => att,
-                    None => return Ok(None),
+                let Some(attachment) = msg.attachments.iter().find(|a| a.height.is_some()) else {
+                    return Ok(None);
                 };
                 on_participation(&msg, conn, attachment).await
             })
@@ -391,11 +387,7 @@ async fn on_participation(
     attachment: &Attachment,
 ) -> StringResult {
     // Find game itself
-    let game = msg.game(conn).await?;
-    let (game, part) = match game {
-        Some(s) => s,
-        None => return Ok(None),
-    };
+    let Some((game, part)) = msg.game(conn).await? else { return Ok(None) };
 
     let part: Participation = if let Some(part) = part {
         // Check the participant
@@ -446,29 +438,22 @@ async fn log_message(ctx: Context, msg: Message) {
 }
 
 async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
-    let bot_id = match ctx.data.read().await.get::<BotUserId>() {
-        Some(id) => id.to_owned(),
-        None => {
-            tracing::warn!("Got react on message but bot it not cached");
-            return Ok(());
-        }
+    let Some(bot_id) = ctx.data.read().await.get::<BotUserId>().copied() else {
+        tracing::warn!("Got react on message but bot is not cached");
+        return Ok(());
     };
     if react.user_id == Some(bot_id) {
         return Ok(());
     }
     let guild_id = react.guild_id.unwrap();
 
-    let mut conn = match ctx.conn().await {
-        Ok(conn) => conn,
-        Err(_e) => {
-            // TODO raise to sentry
-            react.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
-            return Ok(());
-        }
+    let Ok(mut conn) = ctx.conn().await else {
+        // TODO raise to sentry
+        react.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
+        return Ok(());
     };
-    let game = match Game::get(&mut conn, guild_id.0, react.channel_id.0).await? {
-        Some(game) => game,
-        None => return Ok(()),
+    let Some(game) = Game::get(&mut conn, guild_id.0, react.channel_id.0).await? else {
+        return Ok(());
     };
 
     let mut msg = match ctx.cache.message(react.channel_id, react.message_id) {
@@ -488,10 +473,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         .filter(|title| title.contains("Scores"))
         .and_then(|title| title.split(|c| c == '(' || c == '/').nth(1))
         .and_then(|page| page.parse::<usize>().ok());
-    let page = match page {
-        Some(page) => page,
-        None => return Ok(()),
-    };
+    let Some(page) = page else { return Ok(()) };
 
     let page = if react.emoji == ReactionType::Unicode("➡️".to_owned()) {
         page + 1

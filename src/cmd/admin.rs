@@ -19,11 +19,7 @@ use crate::{error::Error, extensions::MessageExt, models::*};
 #[tracing::instrument(skip(_ctx, msg, conn))]
 pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
     tracing::info!("in reset handler");
-    let game = msg.game(conn).await?;
-    let (game, part) = match game {
-        Some((game, part)) => (game, part),
-        None => return Ok(None),
-    };
+    let Some((game, part)) = msg.game(conn).await? else { return Ok(None) };
 
     match msg.content.split(' ').collect::<Vec<_>>().as_slice() {
         [_] => Ok(Some("Pour confirmer le reset, envoie `!reset do`.".to_owned())),
@@ -113,10 +109,7 @@ pub async fn start(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) ->
         return Ok(Some("Il y a déjà une partie en cours dans ce chan".to_owned()));
     }
 
-    let guild = match msg.guild_id {
-        Some(guild) => guild,
-        None => return Ok(None),
-    };
+    let Some(guild) = msg.guild_id else { return Ok(None) };
 
     let game = NewGame {
         guild_id: &guild.to_string(),

@@ -150,11 +150,7 @@ pub async fn win(
 
 pub async fn show(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> CreateMessageResult {
     tracing::info!("Show command invoked");
-    let game = msg.game(conn).await?;
-    let game = match game {
-        Some((game, _)) => game,
-        None => return Ok(None),
-    };
+    let Some((game, _)) = msg.game(conn).await? else { return Ok(None) };
 
     let page = msg.content.split(' ').nth(1).and_then(|p| p.parse().ok()).unwrap_or(1);
     if page < 1 {
@@ -243,19 +239,16 @@ pub async fn pic(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> Cr
     };
 
     let player = part.player();
-    let url = match part.picture_url {
-        Some(url) => url,
-        None => {
-            return Ok(Some(Box::new(move |m| {
-                m.content(
-                    MessageBuilder::new()
-                        .push("C'est au tour de ")
-                        .mention(&player)
-                        .push(" qui n'a pas encore posté de photo.")
-                        .build(),
-                )
-            })));
-        }
+    let Some(url) = part.picture_url else {
+        return Ok(Some(Box::new(move |m| {
+            m.content(
+                MessageBuilder::new()
+                    .push("C'est au tour de ")
+                    .mention(&player)
+                    .push(" qui n'a pas encore posté de photo.")
+                    .build(),
+            )
+        })));
     };
 
     let player = player.to_user(&ctx.http).instrument(info_span!("UserId::to_user")).await?;

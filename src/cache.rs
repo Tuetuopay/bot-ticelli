@@ -1,9 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
-
-/**
+/*!
  * Hand-made cache for users and guild members as discord's apis are doing shit
  * and the serenity cache is empty.
  */
+
+use std::{collections::HashMap, sync::Arc};
+
 use serenity::{
     Result,
     http::CacheHttp,
