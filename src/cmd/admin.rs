@@ -1,6 +1,4 @@
-/*!
- * Admin command handlers
- */
+//! Admin command handlers
 
 use chrono::{DateTime, Utc};
 use diesel::{

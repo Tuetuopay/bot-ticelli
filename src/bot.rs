@@ -1,6 +1,4 @@
-/*!
- * Actual discord client
- */
+//! Actual discord client
 
 use std::collections::HashSet;
 

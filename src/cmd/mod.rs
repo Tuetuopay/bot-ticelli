@@ -1,6 +1,4 @@
-/*!
- * Actual command handlers
- */
+//! Actual command handlers
 
 use serenity::builder::CreateMessage;
 

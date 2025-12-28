@@ -1,6 +1,4 @@
-/*!
- * Regular player command handler
- */
+//! Regular player command handler
 
 use diesel::{
     dsl::{not, now, sum},

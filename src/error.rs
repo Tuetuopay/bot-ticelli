@@ -1,6 +1,4 @@
-/*!
- * Errors that can be returned by bot commands and message handlers
- */
+//! Errors that can be returned by bot commands and message handlers
 
 use std::{
     error::Error as StdError,

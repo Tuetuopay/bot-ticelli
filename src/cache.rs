@@ -1,7 +1,5 @@
-/*!
- * Hand-made cache for users and guild members as discord's apis are doing shit
- * and the serenity cache is empty.
- */
+//! Hand-made cache for users and guild members as discord's apis are doing shit and the serenity
+//! cache is empty.
 
 use std::{collections::HashMap, sync::Arc};
 

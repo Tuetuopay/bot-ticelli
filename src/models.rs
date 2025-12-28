@@ -1,6 +1,4 @@
-/*!
- * DB models for the bot
- */
+//! DB models for the bot
 
 use chrono::{DateTime, Utc};
 use diesel::{

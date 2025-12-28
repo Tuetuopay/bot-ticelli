@@ -1,6 +1,4 @@
-/*!
- * Bot-ter-en-touche config file
- */
+//! Bot-ticelli config file
 
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,4 @@
-/*!
- * Extensions to some builtin or external types
- */
+//! Extensions to some builtin or external types
 
 use async_trait::async_trait;
 use diesel::result::Error;
