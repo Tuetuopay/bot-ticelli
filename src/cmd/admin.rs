@@ -32,7 +32,7 @@ pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) ->
         [_, "do"] => {
             let reset_id = Uuid::new_v4();
             let win_ids = participation::table
-                .filter(participation::is_win)
+                .filter(participation::win_id.is_not_null())
                 .filter(participation::game_id.eq(&game.id))
                 .select(participation::win_id)
                 .load::<Option<Uuid>>(conn)
