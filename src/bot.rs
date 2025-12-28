@@ -21,11 +21,13 @@ use serenity::{
 };
 use tracing::{instrument, Instrument};
 
-use crate::cmd::{player::scoreboard_message, StringResult};
-use crate::error::{Error, ErrorResultExt};
-use crate::extensions::*;
-use crate::models::*;
-use crate::BotUserId;
+use crate::{
+    cmd::{player::scoreboard_message, StringResult},
+    error::{Error, ErrorResultExt},
+    extensions::*,
+    models::*,
+    BotUserId,
+};
 
 pub struct Bot;
 

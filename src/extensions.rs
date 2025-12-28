@@ -10,8 +10,7 @@ use diesel_async::{
 };
 use serenity::{client::Context, model::prelude::Message};
 
-use crate::cache::Cache;
-use crate::{models::*, PgPool};
+use crate::{cache::Cache, models::*, PgPool};
 
 #[async_trait]
 pub trait MessageExt {

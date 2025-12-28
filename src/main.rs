@@ -6,7 +6,10 @@ use diesel_async::{
     pg::AsyncPgConnection,
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
 };
-use opentelemetry::{sdk::trace::Config, sdk::Resource, KeyValue};
+use opentelemetry::{
+    sdk::{trace::Config, Resource},
+    KeyValue,
+};
 use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
 use tokio::spawn;
 use tracing_subscriber::{prelude::*, EnvFilter};

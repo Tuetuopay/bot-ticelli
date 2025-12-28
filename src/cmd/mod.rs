@@ -2,8 +2,9 @@
  * Actual command handlers
  */
 
-use crate::error::Result;
 use serenity::builder::CreateMessage;
+
+use crate::error::Result;
 
 pub mod admin;
 pub mod player;

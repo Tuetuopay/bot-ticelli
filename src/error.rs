@@ -2,8 +2,10 @@
  * Errors that can be returned by bot commands and message handlers
  */
 
-use std::error::Error as StdError;
-use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::{
+    error::Error as StdError,
+    fmt::{Display, Formatter, Result as FmtResult},
+};
 
 use serenity::{http::client::Http, model::id::ChannelId};
 

@@ -14,9 +14,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use super::*;
-use crate::error::Error;
-use crate::extensions::MessageExt;
-use crate::models::*;
+use crate::{error::Error, extensions::MessageExt, models::*};
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
 pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {

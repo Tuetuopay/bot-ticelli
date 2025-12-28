@@ -16,10 +16,12 @@ use serenity::{
 use tracing::{info_span, instrument, Instrument};
 
 use super::*;
-use crate::error::Error;
-use crate::extensions::{ContextExt, MessageExt};
-use crate::models::*;
-use crate::paginate::*;
+use crate::{
+    error::Error,
+    extensions::{ContextExt, MessageExt},
+    models::*,
+    paginate::*,
+};
 
 #[instrument(skip(_ctx, msg, conn))]
 pub async fn skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
