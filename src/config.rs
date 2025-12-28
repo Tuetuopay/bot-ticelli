@@ -39,15 +39,26 @@ pub struct BotConfig {
     pub auto_skip: Option<AutoskipConfig>,
 }
 
+const fn zero() -> u64 {
+    0
+}
+
+const fn one() -> u32 {
+    1
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct RatelimitConfig {
     /// The "break" time, in seconds, between invocations of a command.
-    pub delay: Option<u64>,
+    #[serde(default = "zero")]
+    pub delay: u64,
     /// How long, in seconds, the ratelimit will apply for
-    pub time_span: Option<u64>,
+    #[serde(default = "zero")]
+    pub time_span: u64,
     /// Number of invocations allowed per `time_span`
-    pub limit: Option<u32>,
+    #[serde(default = "one")]
+    pub limit: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
