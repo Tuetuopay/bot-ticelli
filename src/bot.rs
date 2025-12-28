@@ -141,7 +141,7 @@ async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
 #[example("1")]
 #[help_available]
 #[only_in(guild)]
-#[bucket(command_limiter)]
+#[bucket(show_limiter)]
 async fn cmd_show(ctx: &Context, msg: &Message) -> CommandResult {
     cmd_show_(ctx, msg).await
 }
@@ -194,7 +194,7 @@ async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
 #[num_args(0)]
 #[help_available]
 #[only_in(guild)]
-#[bucket(command_limiter)]
+#[bucket(pic_limiter)]
 async fn cmd_pic(ctx: &Context, msg: &Message) -> CommandResult {
     cmd_pic_(ctx, msg).await
 }

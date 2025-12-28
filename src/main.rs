@@ -96,20 +96,22 @@ async fn main() {
         .before(bot::filter_command);
 
     if let Some(rl) = config.bot_config.ratelimit {
-        framework = framework
-            .bucket("command_limiter", |b| {
-                if let Some(delay) = rl.delay {
-                    b.delay(delay);
-                }
-                if let Some(time_span) = rl.time_span {
-                    b.time_span(time_span);
-                }
-                if let Some(limit) = rl.limit {
-                    b.limit(limit);
-                }
-                b
-            })
-            .await;
+        for bucket in ["show_limiter", "pic_limiter"] {
+            framework = framework
+                .bucket(bucket, |b| {
+                    if let Some(delay) = rl.delay {
+                        b.delay(delay);
+                    }
+                    if let Some(time_span) = rl.time_span {
+                        b.time_span(time_span);
+                    }
+                    if let Some(limit) = rl.limit {
+                        b.limit(limit);
+                    }
+                    b
+                })
+                .await;
+        }
     }
 
     let intents = GatewayIntents::GUILDS
