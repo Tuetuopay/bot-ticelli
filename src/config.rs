@@ -71,8 +71,8 @@ pub struct AutoskipConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct TracingConfig {
-    /// Where to send opentelemetry data, in Jaeger format. `<ip|hostname>:<port>`.
-    pub jaeger: Option<String>,
+    /// Where to send opentelemetry data, in OTEL format. `<ip|hostname>:<port>`.
+    pub otel: Option<String>,
     // TODO sentry, prometheus
 }
 

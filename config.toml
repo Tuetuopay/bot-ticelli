@@ -17,4 +17,4 @@ autoskip-delay = 600
 warn-delay = 300
 
 [tracing-config]
-jaeger = "localhost:6831"
+otel = "http://localhost:4318/v1/traces"

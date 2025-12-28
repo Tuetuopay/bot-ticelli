@@ -6,11 +6,12 @@ use diesel_async::{
     pg::AsyncPgConnection,
     pooled_connection::{AsyncDieselConnectionManager, deadpool::Pool},
 };
-use opentelemetry::KeyValue;
-use opentelemetry_sdk::{Resource, trace::Config};
+use opentelemetry::{KeyValue, trace::TracerProvider};
+use opentelemetry_otlp::{Protocol, WithExportConfig};
+use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
 use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
 use tokio::spawn;
-use tracing_subscriber::{EnvFilter, prelude::*};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 mod bot;
 mod cache;
@@ -49,32 +50,42 @@ struct Args {
     config: String,
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = Args::parse();
     let config = config::load_config(&args.config)
         .map_err(|e| format!("Failed to load {}: {e}", args.config))
         .unwrap();
 
-    // Install tracing framework with Jaeger sink
+    // Install tracing framework with OTLP sink
     if let Some(ref tracing) = config.tracing_config {
-        if let Some(ref jaeger) = tracing.jaeger {
-            let tags = vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))];
-            #[allow(deprecated)]
-            let tracer = opentelemetry_jaeger::new_agent_pipeline()
-                .with_endpoint(jaeger)
-                .with_service_name("bot-ticelli")
-                .with_trace_config(Config::default().with_resource(Resource::new(tags)))
-                .install_simple()
-                .expect("Failed to install jaeger tracing");
-            let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+        if let Some(ref otel) = tracing.otel {
+            // You can thank the OTEL guys for such a complicated setup.
+            let provider = SdkTracerProvider::builder()
+                .with_resource(
+                    Resource::builder()
+                        .with_service_name("bot-ticelli")
+                        .with_attribute(KeyValue::new("version", env!("CARGO_PKG_VERSION")))
+                        .build(),
+                )
+                .with_batch_exporter(
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_http()
+                        .with_protocol(Protocol::HttpBinary)
+                        .with_endpoint(otel)
+                        .build()
+                        .expect("Failed to build exporter"),
+                )
+                .build();
             tracing_subscriber::registry()
                 .with(tracing_subscriber::fmt::layer())
-                .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")))
-                .with(telemetry)
-                .try_init()
-                .expect("Failed to install tracing");
-            tracing::info!("Installed jaeger tracing");
+                .with(
+                    EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| EnvFilter::new("bot_ticelli=debug,warn")),
+                )
+                .with(tracing_opentelemetry::layer().with_tracer(provider.tracer("bot-ticelli")))
+                .init();
+            tracing::info!("Installed tracing");
         }
     }
 
