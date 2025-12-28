@@ -7,7 +7,7 @@ use diesel::{
     prelude::{ExpressionMethods, QueryDsl},
 };
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use serenity::{
     client::Context,
     model::prelude::{GuildId, Message},
@@ -136,7 +136,7 @@ pub async fn win(
     let sentence = data
         .get::<crate::WinSentences>()
         .unwrap_or(&def)
-        .choose(&mut rand::thread_rng())
+        .choose(&mut rand::rng())
         .map(String::as_str)
         .unwrap_or("Bravo {}, à vous la main.")
         .split("{}")

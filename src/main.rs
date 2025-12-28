@@ -6,10 +6,8 @@ use diesel_async::{
     pg::AsyncPgConnection,
     pooled_connection::{AsyncDieselConnectionManager, deadpool::Pool},
 };
-use opentelemetry::{
-    KeyValue,
-    sdk::{Resource, trace::Config},
-};
+use opentelemetry::KeyValue;
+use opentelemetry_sdk::{Resource, trace::Config};
 use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
 use tokio::spawn;
 use tracing_subscriber::{EnvFilter, prelude::*};
@@ -63,6 +61,7 @@ async fn main() {
     if let Some(ref tracing) = config.tracing_config {
         if let Some(ref jaeger) = tracing.jaeger {
             let tags = vec![KeyValue::new("version", env!("CARGO_PKG_VERSION"))];
+            #[allow(deprecated)]
             let tracer = opentelemetry_jaeger::new_agent_pipeline()
                 .with_endpoint(jaeger)
                 .with_service_name("bot-ticelli")
