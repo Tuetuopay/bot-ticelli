@@ -5,12 +5,12 @@
 use async_trait::async_trait;
 use diesel::result::Error;
 use diesel_async::{
-    pooled_connection::deadpool::{Object, Pool, PoolError},
     AsyncPgConnection,
+    pooled_connection::deadpool::{Object, Pool, PoolError},
 };
 use serenity::{client::Context, model::prelude::Message};
 
-use crate::{cache::Cache, models::*, PgPool};
+use crate::{PgPool, cache::Cache, models::*};
 
 #[async_trait]
 pub trait MessageExt {

@@ -2,8 +2,8 @@
 
 use std::{sync::Arc, time::Duration};
 
-use diesel::{dsl::*, ExpressionMethods, QueryDsl};
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection, RunQueryDsl};
+use diesel::{ExpressionMethods, QueryDsl, dsl::*};
+use diesel_async::{AsyncPgConnection, RunQueryDsl, pooled_connection::deadpool::Pool};
 use serenity::{http::Http, utils::MessageBuilder};
 use tokio::time::interval;
 use tracing::{error, info, instrument};
@@ -11,7 +11,7 @@ use tracing::{error, info, instrument};
 use crate::{
     config::AutoskipConfig,
     error::Result,
-    models::{game, participation, Game, Participation},
+    models::{Game, Participation, game, participation},
 };
 
 pub async fn task_auto_skip(

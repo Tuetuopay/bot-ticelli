@@ -2,7 +2,7 @@
 name = "bot-ticelli"
 version = "1.4.4"
 authors = ["Tuetuopay <tuetuopay@me.com>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 async-trait = "0.1"

@@ -10,23 +10,22 @@ use futures::future::FutureExt;
 use serenity::{
     client::{Context, EventHandler},
     framework::standard::{
-        help_commands,
+        Args, CommandGroup, CommandResult, HelpOptions, help_commands,
         macros::{command, group, help, hook},
-        Args, CommandGroup, CommandResult, HelpOptions,
     },
     model::prelude::{
         Attachment, Guild, GuildMembersChunkEvent, Member, Message, Reaction, ReactionType, UserId,
     },
     utils::Colour,
 };
-use tracing::{instrument, Instrument};
+use tracing::{Instrument, instrument};
 
 use crate::{
-    cmd::{player::scoreboard_message, StringResult},
+    BotUserId,
+    cmd::{StringResult, player::scoreboard_message},
     error::{Error, ErrorResultExt},
     extensions::*,
     models::*,
-    BotUserId,
 };
 
 pub struct Bot;

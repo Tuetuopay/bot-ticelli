@@ -31,11 +31,7 @@ pub enum Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if let Some(error) = self.source() {
-            write!(f, "{error}")
-        } else {
-            Ok(())
-        }
+        if let Some(error) = self.source() { write!(f, "{error}") } else { Ok(()) }
     }
 }
 

@@ -4,7 +4,7 @@
  */
 
 use diesel::{pg::Pg, prelude::*, query_builder::*, sql_types::BigInt};
-use diesel_async::{methods::LoadQuery, AsyncPgConnection, RunQueryDsl};
+use diesel_async::{AsyncPgConnection, RunQueryDsl, methods::LoadQuery};
 
 pub trait Paginate: Sized {
     fn paginate(self, page: i64) -> Paginated<Self>;

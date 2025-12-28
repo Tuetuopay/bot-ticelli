@@ -13,7 +13,7 @@ use serenity::{
     model::prelude::{GuildId, Message},
     utils::{Colour, MessageBuilder},
 };
-use tracing::{info_span, instrument, Instrument};
+use tracing::{Instrument, info_span, instrument};
 
 use super::*;
 use crate::{
@@ -255,7 +255,7 @@ pub async fn pic(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> Cr
                         .push(" qui n'a pas encore posté de photo.")
                         .build(),
                 )
-            })))
+            })));
         }
     };
 

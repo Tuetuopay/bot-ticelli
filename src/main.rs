@@ -4,15 +4,15 @@ extern crate diesel;
 use clap::Parser;
 use diesel_async::{
     pg::AsyncPgConnection,
-    pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
+    pooled_connection::{AsyncDieselConnectionManager, deadpool::Pool},
 };
 use opentelemetry::{
-    sdk::{trace::Config, Resource},
     KeyValue,
+    sdk::{Resource, trace::Config},
 };
 use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
 use tokio::spawn;
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 mod bot;
 mod cache;

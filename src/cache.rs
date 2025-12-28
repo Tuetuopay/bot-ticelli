@@ -5,10 +5,10 @@ use std::{collections::HashMap, sync::Arc};
  * and the serenity cache is empty.
  */
 use serenity::{
+    Result,
     http::CacheHttp,
     model::prelude::{GuildId, Member, User, UserId},
     prelude::TypeMapKey,
-    Result,
 };
 use tokio::sync::RwLock;
 use tracing::{instrument, trace};
