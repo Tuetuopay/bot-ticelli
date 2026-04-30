@@ -93,7 +93,7 @@ async fn cmd_skip_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| Box::pin(crate::cmd::player::skip(ctx.clone(), msg.clone(), conn)))
+        .run(async |conn| crate::cmd::player::skip(ctx.clone(), msg.clone(), conn).await)
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -120,7 +120,7 @@ async fn cmd_win_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| Box::pin(crate::cmd::player::win(ctx.clone(), msg.clone(), conn, false)))
+        .run(async |conn| crate::cmd::player::win(ctx.clone(), msg.clone(), conn, false).await)
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -176,7 +176,7 @@ async fn cmd_reset_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| Box::pin(crate::cmd::admin::reset(ctx.clone(), msg.clone(), conn)))
+        .run(async |conn| crate::cmd::admin::reset(ctx.clone(), msg.clone(), conn).await)
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -245,7 +245,7 @@ async fn cmd_force_skip_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| Box::pin(crate::cmd::admin::force_skip(ctx.clone(), msg.clone(), conn)))
+        .run(async |conn| crate::cmd::admin::force_skip(ctx.clone(), msg.clone(), conn).await)
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -270,7 +270,7 @@ async fn cmd_start_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| Box::pin(crate::cmd::admin::start(ctx.clone(), msg.clone(), conn)))
+        .run(async |conn| crate::cmd::admin::start(ctx.clone(), msg.clone(), conn).await)
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -295,7 +295,7 @@ async fn cmd_force_win_(ctx: &Context, msg: &Message) -> CommandResult {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| Box::pin(crate::cmd::player::win(ctx.clone(), msg.clone(), conn, true)))
+        .run(async |conn| crate::cmd::player::win(ctx.clone(), msg.clone(), conn, true).await)
         .await;
     if let Some(reply) = res.handle_err(&msg.channel_id, &ctx.http).await? {
         msg.channel_id.say(&ctx.http, reply).await?;
@@ -362,14 +362,12 @@ pub async fn on_message_(ctx: Context, msg: Message) {
     let res = conn
         .build_transaction()
         .serializable()
-        .run(|conn| {
-            Box::pin(async {
-                // Find picture attachment
-                let Some(attachment) = msg.attachments.iter().find(|a| a.height.is_some()) else {
-                    return Ok(None);
-                };
-                on_participation(&msg, conn, attachment).await
-            })
+        .run(async |conn| {
+            // Find picture attachment
+            let Some(attachment) = msg.attachments.iter().find(|a| a.height.is_some()) else {
+                return Ok(None);
+            };
+            on_participation(&msg, conn, attachment).await
         })
         .await;
 
