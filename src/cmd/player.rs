@@ -1,32 +1,32 @@
 //! Regular player command handler
 
+use std::num::NonZeroUsize;
+
 use diesel::{
     dsl::{not, now, sum},
     prelude::{ExpressionMethods, QueryDsl},
 };
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
+use poise::CreateReply;
 use rand::seq::IndexedRandom;
 use serenity::{
-    all::{Colour, CreateEmbed, CreateEmbedAuthor, CreateMessage},
-    client::Context,
-    model::prelude::{GuildId, Message},
+    all::{Colour, Context, CreateEmbed, CreateEmbedAuthor, User},
+    model::prelude::GuildId,
     utils::MessageBuilder,
 };
 use tracing::{Instrument, info_span, instrument};
 
 use crate::{
+    cache::Cache,
+    context::Ctx,
     error::{Error, Result},
-    extensions::{ContextExt, MessageExt},
+    extensions::HasGame,
     models::*,
 };
 
-#[instrument(skip(_ctx, msg, conn))]
-pub async fn skip(
-    _ctx: Context,
-    msg: Message,
-    conn: &mut AsyncPgConnection,
-) -> Result<Option<String>> {
-    let game = msg.game(conn).await?;
+#[instrument(skip(ctx, conn))]
+pub async fn skip(ctx: Ctx<'_>, conn: &mut AsyncPgConnection) -> Result<Option<String>> {
+    let game = ctx.game(conn).await?;
 
     let part = match game {
         Some((_, Some(part))) => part,
@@ -34,29 +34,28 @@ pub async fn skip(
         None => return Ok(None),
     };
 
-    if part.player_id != msg.author.id.to_string() {
+    if part.player_id != ctx.author().id.to_string() {
         return Err(Error::NotYourTurn);
     }
 
     part.skip(conn, true).await?;
 
-    Ok(Some(
-        MessageBuilder::new()
-            .push("A vos photos, ")
-            .mention(&msg.author)
-            .push(" passe la main !")
-            .build(),
-    ))
+    let msg = MessageBuilder::new()
+        .push("A vos photos, ")
+        .mention(ctx.author())
+        .push(" passe la main !")
+        .build();
+    Ok(Some(msg))
 }
 
-#[instrument(skip(ctx, msg, conn))]
+#[instrument(skip(ctx, conn, winner))]
 pub async fn win(
-    ctx: Context,
-    msg: Message,
+    ctx: Ctx<'_>,
     conn: &mut AsyncPgConnection,
+    winner: User,
     force: bool,
 ) -> Result<Option<String>> {
-    let game = msg.game(conn).await?;
+    let game = ctx.game(conn).await?;
     let (game, part) = match game {
         Some((game, Some(part))) => (game, part),
         Some(_) => return Err(Error::NoParticipant),
@@ -64,51 +63,29 @@ pub async fn win(
     };
 
     // Check that participation is valid
-    if !force && part.player_id != msg.author.id.to_string() {
+    if !force && part.player_id != ctx.author().id.to_string() {
         return Err(Error::NotYourTurn);
     }
     if part.picture_url.is_none() {
         return Err(Error::YouPostedNoPic);
     }
 
-    // Check that a single winner is mentioned
-    let winner = match msg.mentions.as_slice() {
-        [] => {
-            // TODO this should be an error
-            return Ok(Some(
-                MessageBuilder::new().mention(&msg.author).push(", cékiki le gagnant ?").build(),
-            ));
-        }
-        [winner] => winner,
-        [..] => {
-            // TODO this should be an error
-            return Ok(Some(
-                MessageBuilder::new()
-                    .push("Hé ")
-                    .mention(&msg.author)
-                    .push(", tu serai pas un peu fada ? Un seul gagnant, un seul !")
-                    .build(),
-            ));
-        }
-    };
-
     // Check that winner is valid (neither current participant nor a bot)
     if winner.bot {
         return Err(Error::StfuBot);
     }
-    if winner.id == msg.author.id && !force {
+    if winner.id == ctx.author().id && !force {
         // TODO this should be an error
-        return Ok(Some(
-            MessageBuilder::new()
-                .mention(&msg.author)
-                .push(" be like https://i.imgflip.com/12w3f0.jpg")
-                .build(),
-        ));
+        let msg = MessageBuilder::new()
+            .mention(ctx.author())
+            .push(" be like https://i.imgflip.com/12w3f0.jpg")
+            .build();
+        return Ok(Some(msg));
     }
 
     // Save the win
     let win = NewWin {
-        player_id: &msg.author.id.get().to_string(),
+        player_id: &ctx.author().id.get().to_string(),
         winner_id: &winner.id.get().to_string(),
         score: 1,
     };
@@ -132,11 +109,9 @@ pub async fn win(
         .get_result::<Participation>(conn)
         .await?;
 
-    let def = vec![];
-    let data = ctx.data.read().await;
+    let data = ctx.data();
     let sentence = data
-        .get::<crate::WinSentences>()
-        .unwrap_or(&def)
+        .win_sentences
         .choose(&mut rand::rng())
         .map(String::as_str)
         .unwrap_or("Bravo {}, à vous la main.")
@@ -147,31 +122,32 @@ pub async fn win(
         _ => ("Bravo ", ", à vous la main."),
     };
 
-    Ok(Some(MessageBuilder::new().push(left).mention(winner).push(right).build()))
+    Ok(Some(MessageBuilder::new().push(left).mention(&winner).push(right).build()))
 }
 
+#[instrument(skip(ctx, conn), err)]
 pub async fn show(
-    ctx: Context,
-    msg: Message,
+    ctx: Ctx<'_>,
     conn: &mut AsyncPgConnection,
-) -> Result<Option<CreateMessage>> {
-    tracing::info!("Show command invoked");
-    let Some((game, _)) = msg.game(conn).await? else { return Ok(None) };
+    page: Option<NonZeroUsize>,
+) -> Result<Option<CreateReply>> {
+    let Some((game, _)) = ctx.game(conn).await? else { return Ok(None) };
 
-    let page = msg.content.split(' ').nth(1).and_then(|p| p.parse().ok()).unwrap_or(1);
-    if page < 1 {
-        return Err(Error::InvalidPage);
-    }
+    let cache = &ctx.data().cache;
+    let guild_id = ctx.guild_id().unwrap();
+    let ctx = ctx.serenity_context();
+    let page = page.map(|page| page.get()).unwrap_or(1);
 
-    let (title, board) = scoreboard_message(&ctx, conn, game, msg.guild_id.unwrap(), page).await?;
+    let (title, board) = scoreboard_message(ctx, conn, cache, game, guild_id, page).await?;
 
     let embed = CreateEmbed::new().title(title).colour(Colour::GOLD).fields(board);
-    Ok(Some(CreateMessage::new().embed(embed)))
+    Ok(Some(CreateReply::default().embed(embed)))
 }
 
 pub async fn scoreboard_message(
     ctx: &Context,
     conn: &mut AsyncPgConnection,
+    cache: &Cache,
     game: Game,
     guild: GuildId,
     page: usize,
@@ -193,7 +169,6 @@ pub async fn scoreboard_message(
         return Err(Error::InvalidPage);
     }
 
-    let cache = ctx.cache().await;
     let board = wins
         .into_iter()
         .skip((page - 1) * per_page)
@@ -210,7 +185,7 @@ pub async fn scoreboard_message(
                     3 => "🥉".to_owned(),
                     p => p.to_string(),
                 };
-                let member = cache.member(&ctx, guild, id).await;
+                let member = cache.member(ctx, guild, id).await;
                 let name = match member {
                     Ok(member) => Ok(member.display_name().to_string()),
                     Err(e) => {
@@ -218,7 +193,7 @@ pub async fn scoreboard_message(
                         "Failed to fetch member #{i} {id}: {e}, falling back to fetching the user. \
                         Maybe the user left the guild?",
                     );
-                        cache.user(&ctx, id).await.map(|user| user.name)
+                        cache.user(ctx, id).await.map(|user| user.name)
                     }
                 };
                 name.map(|name| (format!("{position}. {name}"), score.to_string(), false))
@@ -236,13 +211,9 @@ pub async fn scoreboard_message(
     Ok((format!("👑 👑 👑 Scores ({page}/{page_count}) 👑 👑 👑"), board))
 }
 
-//#[instrument(skip(ctx, msg, conn))]
-pub async fn pic(
-    ctx: Context,
-    msg: Message,
-    conn: &mut AsyncPgConnection,
-) -> Result<Option<CreateMessage>> {
-    let game = msg.game(conn).await?;
+#[instrument(skip_all, err)]
+pub async fn pic(ctx: Ctx<'_>, conn: &mut AsyncPgConnection) -> Result<Option<CreateReply>> {
+    let game = ctx.game(conn).await?;
     let part = match game {
         Some((_, Some(part))) => part,
         Some(_) => return Err(Error::NoParticipant),
@@ -256,29 +227,25 @@ pub async fn pic(
             .mention(&player)
             .push(" qui n'a pas encore posté de photo.")
             .build();
-        return Ok(Some(CreateMessage::new().content(msg)));
+        return Ok(Some(CreateReply::default().content(msg)));
     };
 
-    let player = player.to_user(&ctx.http).instrument(info_span!("UserId::to_user")).await?;
+    let player = player.to_user(&ctx).instrument(info_span!("UserId::to_user")).await?;
     let nick = player
-        .nick_in(&ctx.http, msg.guild_id.unwrap())
+        .nick_in(&ctx, ctx.guild_id().unwrap())
         .instrument(info_span!("User::nick_in"))
         .await
         .unwrap_or_else(|| player.name.clone());
 
     let author = CreateEmbedAuthor::new(nick).icon_url(player.face());
     let embed = CreateEmbed::new().author(author).image(url);
-    let msg = CreateMessage::new().embed(embed);
+    let msg = CreateReply::default().embed(embed);
     Ok(Some(msg))
 }
 
-#[instrument(skip(_ctx, msg, conn))]
-pub async fn change(
-    _ctx: Context,
-    msg: Message,
-    conn: &mut AsyncPgConnection,
-) -> Result<Option<String>> {
-    let game = msg.game(conn).await?;
+#[instrument(skip_all, err)]
+pub async fn change(ctx: Ctx<'_>, conn: &mut AsyncPgConnection) -> Result<Option<String>> {
+    let game = ctx.game(conn).await?;
 
     let part = match game {
         Some((_, Some(part))) => part,
@@ -286,7 +253,7 @@ pub async fn change(
         None => return Ok(None),
     };
 
-    if part.player_id != msg.author.id.to_string() {
+    if part.player_id != ctx.author().id.to_string() {
         return Err(Error::NotYourTurn);
     }
 

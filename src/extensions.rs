@@ -1,25 +1,22 @@
 //! Extensions to some builtin or external types
 
-use async_trait::async_trait;
 use diesel::result::Error;
 use diesel_async::{
     AsyncPgConnection,
-    pooled_connection::deadpool::{Object, Pool, PoolError},
+    pooled_connection::deadpool::{Object, PoolError},
 };
-use serenity::{client::Context, model::prelude::Message};
+use serenity::model::prelude::Message;
 
-use crate::{PgPool, cache::Cache, models::*};
+use crate::{context::Ctx, models::*};
 
-#[async_trait]
-pub trait MessageExt {
+pub trait HasGame {
     async fn game(
         &self,
         conn: &mut AsyncPgConnection,
     ) -> Result<Option<(Game, Option<Participation>)>, Error>;
 }
 
-#[async_trait]
-impl MessageExt for Message {
+impl HasGame for Message {
     async fn game(
         &self,
         conn: &mut AsyncPgConnection,
@@ -31,22 +28,22 @@ impl MessageExt for Message {
     }
 }
 
-#[serenity::async_trait]
-pub trait ContextExt {
-    async fn cache(&self) -> Cache;
-    async fn pool(&self) -> Pool<AsyncPgConnection>;
+impl HasGame for Ctx<'_> {
+    async fn game(
+        &self,
+        conn: &mut AsyncPgConnection,
+    ) -> Result<Option<(Game, Option<Participation>)>, Error> {
+        let Some(guild_id) = self.guild_id() else { return Ok(None) };
+        Game::get_with_part(conn, guild_id.get(), self.channel_id().get()).await
+    }
+}
+
+pub trait CtxExt {
     async fn conn(&self) -> Result<Object<AsyncPgConnection>, PoolError>;
 }
 
-#[serenity::async_trait]
-impl ContextExt for Context {
-    async fn cache(&self) -> Cache {
-        self.data.read().await.get::<Cache>().unwrap().clone()
-    }
-    async fn pool(&self) -> Pool<AsyncPgConnection> {
-        self.data.read().await.get::<PgPool>().unwrap().clone()
-    }
+impl CtxExt for Ctx<'_> {
     async fn conn(&self) -> Result<Object<AsyncPgConnection>, PoolError> {
-        self.pool().await.get().await
+        self.data().pool.get().await
     }
 }

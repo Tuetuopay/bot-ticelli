@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 #[macro_use]
 extern crate diesel;
 
@@ -11,19 +9,18 @@ use diesel_async::{
 use opentelemetry::{KeyValue, trace::TracerProvider};
 use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
-use serenity::{
-    all::standard::{BucketBuilder, Configuration},
-    framework::StandardFramework,
-    model::id::UserId,
-    prelude::*,
-};
+use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions, samples::register_in_guild};
+use serenity::prelude::*;
 use tokio::spawn;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::context::Data;
 
 mod bot;
 mod cache;
 mod cmd;
 mod config;
+mod context;
 mod cron;
 mod error;
 mod extensions;
@@ -31,22 +28,6 @@ mod models;
 mod schema;
 
 use bot::Bot;
-use cache::Cache;
-
-struct PgPool;
-impl TypeMapKey for PgPool {
-    type Value = Pool<AsyncPgConnection>;
-}
-
-struct WinSentences;
-impl TypeMapKey for WinSentences {
-    type Value = Vec<String>;
-}
-
-struct BotUserId;
-impl TypeMapKey for BotUserId {
-    type Value = UserId;
-}
 
 /// A small Discord bot for managing picture-guessing games.
 #[derive(Parser, Debug)]
@@ -102,25 +83,32 @@ async fn main() {
         AsyncDieselConnectionManager::<AsyncPgConnection>::new(&config.db_config.database_url);
     let pool = Pool::builder(manager).build().expect("Failed to create connection pool");
 
+    let context = Data::new(&config, pool.clone());
+
     // Create client instance
     tracing::info!("Connecting to discord...");
-    let mut framework = StandardFramework::new()
-        .group(&bot::GENERAL_GROUP)
-        .help(&bot::CMD_HELP)
-        .normal_message(bot::on_message)
-        .before(bot::filter_command);
-    framework
-        .configure(Configuration::new().allow_dm(false).prefix(&config.bot_config.command_prefix));
-
-    if let Some(rl) = config.bot_config.ratelimit {
-        for bucket in ["show_limiter", "pic_limiter"] {
-            let builder = BucketBuilder::new_channel()
-                .delay(rl.delay)
-                .time_span(rl.time_span)
-                .limit(rl.limit);
-            framework = framework.bucket(bucket, builder).await;
-        }
-    }
+    let framework = Framework::builder()
+        .options(FrameworkOptions {
+            commands: cmd::commands(),
+            prefix_options: PrefixFrameworkOptions {
+                prefix: Some(config.bot_config.command_prefix.clone()),
+                ..Default::default()
+            },
+            on_error: |e| Box::pin(bot::on_error(e)),
+            event_handler: |ctx, event, fw_ctx, data| {
+                Box::pin(bot::on_event(ctx, event, fw_ctx, data))
+            },
+            ..Default::default()
+        })
+        .setup(|ctx, ready, framework| {
+            Box::pin(async move {
+                for guild in &ready.guilds {
+                    register_in_guild(ctx, &framework.options().commands, guild.id).await?;
+                }
+                Ok(context)
+            })
+        })
+        .build();
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS
@@ -130,9 +118,6 @@ async fn main() {
     let mut client = Client::builder(&config.auth.token, intents)
         .event_handler(Bot)
         .framework(framework)
-        .type_map_insert::<PgPool>(pool.clone())
-        .type_map_insert::<WinSentences>(config.bot_config.win_sentences)
-        .type_map_insert::<Cache>(Cache::default())
         .await
         .expect("Failed to create discord client");
 

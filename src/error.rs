@@ -5,8 +5,6 @@ use std::{
     fmt::{Display, Formatter, Result as FmtResult},
 };
 
-use serenity::{http::Http, model::id::ChannelId};
-
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
@@ -24,7 +22,6 @@ pub enum Error {
     PicAlreadyPosted,
     InvalidPage,
     InvalidResetId,
-    UnknownArguments,
 }
 
 impl Display for Error {
@@ -55,7 +52,6 @@ impl Error {
             Self::PicAlreadyPosted => Some("🦜 T'as déjà mis une photo coco."),
             Self::InvalidPage => Some("Page invalide"),
             Self::InvalidResetId => Some("ID de reset invalide"),
-            Self::UnknownArguments => Some("Arguments inconnus"),
         };
         ret.map(|s| s.to_owned())
     }
@@ -76,22 +72,5 @@ impl From<diesel_async::pooled_connection::deadpool::PoolError> for Error {
 impl From<serenity::Error> for Error {
     fn from(e: serenity::Error) -> Error {
         Error::Serenity(e)
-    }
-}
-
-#[async_trait::async_trait]
-pub trait ErrorResultExt: Send {
-    async fn handle_err(self, chan: &ChannelId, http: &Http) -> Self;
-}
-
-#[async_trait::async_trait]
-impl<T: Send> ErrorResultExt for Result<T> {
-    async fn handle_err(self, chan: &ChannelId, http: &Http) -> Self {
-        if let Err(ref e) = self {
-            if let Some(s) = e.as_message() {
-                chan.say(http, s).await?;
-            }
-        }
-        self
     }
 }
