@@ -11,11 +11,18 @@ use serenity::{client::Context, model::prelude::Message, utils::MessageBuilder};
 use tracing::info;
 use uuid::Uuid;
 
-use super::*;
-use crate::{error::Error, extensions::MessageExt, models::*};
+use crate::{
+    error::{Error, Result},
+    extensions::MessageExt,
+    models::*,
+};
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
-pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+pub async fn reset(
+    _ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<String>> {
     tracing::info!("in reset handler");
     let Some((game, part)) = msg.game(conn).await? else { return Ok(None) };
 
@@ -80,7 +87,11 @@ pub async fn reset(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) ->
 }
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
-pub async fn force_skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+pub async fn force_skip(
+    _ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<String>> {
     let game = msg.game(conn).await?;
     let part = match game {
         Some((_, Some(part))) => part,
@@ -100,7 +111,11 @@ pub async fn force_skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnectio
 }
 
 #[tracing::instrument(skip(_ctx, msg, conn))]
-pub async fn start(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+pub async fn start(
+    _ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<String>> {
     let game = msg.game(conn).await?;
 
     if game.is_some() {

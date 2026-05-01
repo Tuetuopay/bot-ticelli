@@ -7,21 +7,25 @@ use diesel::{
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use rand::seq::IndexedRandom;
 use serenity::{
+    all::{Colour, CreateEmbed, CreateEmbedAuthor, CreateMessage},
     client::Context,
     model::prelude::{GuildId, Message},
-    utils::{Colour, MessageBuilder},
+    utils::MessageBuilder,
 };
 use tracing::{Instrument, info_span, instrument};
 
-use super::*;
 use crate::{
-    error::Error,
+    error::{Error, Result},
     extensions::{ContextExt, MessageExt},
     models::*,
 };
 
 #[instrument(skip(_ctx, msg, conn))]
-pub async fn skip(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+pub async fn skip(
+    _ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<String>> {
     let game = msg.game(conn).await?;
 
     let part = match game {
@@ -51,7 +55,7 @@ pub async fn win(
     msg: Message,
     conn: &mut AsyncPgConnection,
     force: bool,
-) -> StringResult {
+) -> Result<Option<String>> {
     let game = msg.game(conn).await?;
     let (game, part) = match game {
         Some((game, Some(part))) => (game, part),
@@ -104,8 +108,8 @@ pub async fn win(
 
     // Save the win
     let win = NewWin {
-        player_id: &msg.author.id.0.to_string(),
-        winner_id: &winner.id.0.to_string(),
+        player_id: &msg.author.id.get().to_string(),
+        winner_id: &winner.id.get().to_string(),
         score: 1,
     };
     let win: Win = diesel::insert_into(win::table).values(win).get_result(conn).await?;
@@ -146,7 +150,11 @@ pub async fn win(
     Ok(Some(MessageBuilder::new().push(left).mention(winner).push(right).build()))
 }
 
-pub async fn show(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> CreateMessageResult {
+pub async fn show(
+    ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<CreateMessage>> {
     tracing::info!("Show command invoked");
     let Some((game, _)) = msg.game(conn).await? else { return Ok(None) };
 
@@ -157,7 +165,8 @@ pub async fn show(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> C
 
     let (title, board) = scoreboard_message(&ctx, conn, game, msg.guild_id.unwrap(), page).await?;
 
-    Ok(Some(Box::new(move |m| m.embed(|e| e.title(title).colour(Colour::GOLD).fields(board)))))
+    let embed = CreateEmbed::new().title(title).colour(Colour::GOLD).fields(board);
+    Ok(Some(CreateMessage::new().embed(embed)))
 }
 
 pub async fn scoreboard_message(
@@ -166,7 +175,7 @@ pub async fn scoreboard_message(
     game: Game,
     guild: GuildId,
     page: usize,
-) -> Result<(String, Vec<(String, i64, bool)>)> {
+) -> Result<(String, Vec<(String, String, bool)>)> {
     let wins = win::table
         .group_by(win::winner_id)
         .select((sum(win::score), win::winner_id))
@@ -212,7 +221,7 @@ pub async fn scoreboard_message(
                         cache.user(&ctx, id).await.map(|user| user.name)
                     }
                 };
-                name.map(|name| (format!("{position}. {name}"), score, false))
+                name.map(|name| (format!("{position}. {name}"), score.to_string(), false))
             }
             .instrument(span)
         });
@@ -228,7 +237,11 @@ pub async fn scoreboard_message(
 }
 
 //#[instrument(skip(ctx, msg, conn))]
-pub async fn pic(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> CreateMessageResult {
+pub async fn pic(
+    ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<CreateMessage>> {
     let game = msg.game(conn).await?;
     let part = match game {
         Some((_, Some(part))) => part,
@@ -238,15 +251,12 @@ pub async fn pic(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> Cr
 
     let player = part.player();
     let Some(url) = part.picture_url else {
-        return Ok(Some(Box::new(move |m| {
-            m.content(
-                MessageBuilder::new()
-                    .push("C'est au tour de ")
-                    .mention(&player)
-                    .push(" qui n'a pas encore posté de photo.")
-                    .build(),
-            )
-        })));
+        let msg = MessageBuilder::new()
+            .push("C'est au tour de ")
+            .mention(&player)
+            .push(" qui n'a pas encore posté de photo.")
+            .build();
+        return Ok(Some(CreateMessage::new().content(msg)));
     };
 
     let player = player.to_user(&ctx.http).instrument(info_span!("UserId::to_user")).await?;
@@ -256,13 +266,18 @@ pub async fn pic(ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> Cr
         .await
         .unwrap_or_else(|| player.name.clone());
 
-    Ok(Some(Box::new(move |m| {
-        m.embed(|e| e.author(|a| a.name(nick).icon_url(player.face())).image(url))
-    })))
+    let author = CreateEmbedAuthor::new(nick).icon_url(player.face());
+    let embed = CreateEmbed::new().author(author).image(url);
+    let msg = CreateMessage::new().embed(embed);
+    Ok(Some(msg))
 }
 
 #[instrument(skip(_ctx, msg, conn))]
-pub async fn change(_ctx: Context, msg: Message, conn: &mut AsyncPgConnection) -> StringResult {
+pub async fn change(
+    _ctx: Context,
+    msg: Message,
+    conn: &mut AsyncPgConnection,
+) -> Result<Option<String>> {
     let game = msg.game(conn).await?;
 
     let part = match game {

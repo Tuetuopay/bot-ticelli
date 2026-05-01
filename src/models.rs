@@ -89,7 +89,7 @@ impl Participation {
     }
 
     pub fn player(&self) -> UserId {
-        UserId(self.player_id.parse().unwrap())
+        UserId::new(self.player_id.parse().unwrap())
     }
 }
 
@@ -145,7 +145,7 @@ impl Game {
     }
 
     pub fn channel(&self) -> ChannelId {
-        ChannelId(self.channel_id.parse().unwrap())
+        ChannelId::new(self.channel_id.parse().unwrap())
     }
 }
 

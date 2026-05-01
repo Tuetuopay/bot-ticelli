@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 #[macro_use]
 extern crate diesel;
 
@@ -9,7 +11,12 @@ use diesel_async::{
 use opentelemetry::{KeyValue, trace::TracerProvider};
 use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
-use serenity::{framework::StandardFramework, model::id::UserId, prelude::*};
+use serenity::{
+    all::standard::{BucketBuilder, Configuration},
+    framework::StandardFramework,
+    model::id::UserId,
+    prelude::*,
+};
 use tokio::spawn;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -98,17 +105,20 @@ async fn main() {
     // Create client instance
     tracing::info!("Connecting to discord...");
     let mut framework = StandardFramework::new()
-        .configure(|c| c.allow_dm(false).prefix(&config.bot_config.command_prefix))
         .group(&bot::GENERAL_GROUP)
         .help(&bot::CMD_HELP)
         .normal_message(bot::on_message)
         .before(bot::filter_command);
+    framework
+        .configure(Configuration::new().allow_dm(false).prefix(&config.bot_config.command_prefix));
 
     if let Some(rl) = config.bot_config.ratelimit {
         for bucket in ["show_limiter", "pic_limiter"] {
-            framework = framework
-                .bucket(bucket, |b| b.delay(rl.delay).time_span(rl.time_span).limit(rl.limit))
-                .await;
+            let builder = BucketBuilder::new_channel()
+                .delay(rl.delay)
+                .time_span(rl.time_span)
+                .limit(rl.limit);
+            framework = framework.bucket(bucket, builder).await;
         }
     }
 
@@ -127,7 +137,7 @@ async fn main() {
         .expect("Failed to create discord client");
 
     if let Some(autoskip) = config.bot_config.auto_skip {
-        spawn(cron::task_auto_skip(client.cache_and_http.http.clone(), pool, autoskip));
+        spawn(cron::task_auto_skip(client.http.clone(), pool, autoskip));
     }
 
     tracing::info!("Runing app...");

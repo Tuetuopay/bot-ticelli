@@ -25,7 +25,7 @@ impl MessageExt for Message {
         conn: &mut AsyncPgConnection,
     ) -> Result<Option<(Game, Option<Participation>)>, Error> {
         Ok(match self.guild_id {
-            Some(id) => Game::get_with_part(conn, *id.as_u64(), *self.channel_id.as_u64()).await?,
+            Some(id) => Game::get_with_part(conn, id.get(), self.channel_id.get()).await?,
             None => None,
         })
     }

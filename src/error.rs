@@ -5,7 +5,7 @@ use std::{
     fmt::{Display, Formatter, Result as FmtResult},
 };
 
-use serenity::{http::client::Http, model::id::ChannelId};
+use serenity::{http::Http, model::id::ChannelId};
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 

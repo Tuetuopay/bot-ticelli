@@ -25,5 +25,5 @@ tracing-opentelemetry = "0.32"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = "1.0"
 serde_derive = "1.0"
-serenity = "0.11"
+serenity = "0.12"
 uuid = { version = "1", features = ["v4"] }

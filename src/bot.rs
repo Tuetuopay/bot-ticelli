@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use diesel::{dsl::now, prelude::ExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use serenity::{
+    all::{Colour, CreateEmbed, EditMessage, GuildMemberUpdateEvent},
     client::{Context, EventHandler},
     framework::standard::{
         Args, CommandGroup, CommandResult, HelpOptions, help_commands,
@@ -13,14 +14,13 @@ use serenity::{
     model::prelude::{
         Attachment, Guild, GuildMembersChunkEvent, Member, Message, Reaction, ReactionType, UserId,
     },
-    utils::Colour,
 };
 use tracing::{Instrument, instrument};
 
 use crate::{
     BotUserId,
-    cmd::{StringResult, player::scoreboard_message},
-    error::{Error, ErrorResultExt},
+    cmd::player::scoreboard_message,
+    error::{Error, ErrorResultExt, Result},
     extensions::*,
     models::*,
 };
@@ -34,7 +34,7 @@ impl EventHandler for Bot {
     }
 
     #[instrument(skip(self, ctx, guild))]
-    async fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
+    async fn guild_create(&self, ctx: Context, guild: Guild, _is_new: Option<bool>) {
         tracing::debug!("Guild created {:?}", guild.id);
 
         // List guild members
@@ -51,9 +51,17 @@ impl EventHandler for Bot {
     }
 
     #[instrument(skip(self, ctx))]
-    async fn guild_member_update(&self, ctx: Context, _old: Option<Member>, new: Member) {
+    async fn guild_member_update(
+        &self,
+        ctx: Context,
+        _old: Option<Member>,
+        new: Option<Member>,
+        _event: GuildMemberUpdateEvent,
+    ) {
         tracing::debug!("guild member updated");
-        ctx.cache().await.update(new).await;
+        if let Some(new) = new {
+            ctx.cache().await.update(new).await;
+        }
     }
 
     #[instrument(skip(self, ctx, chunk))]
@@ -381,7 +389,7 @@ async fn on_participation(
     msg: &Message,
     conn: &mut AsyncPgConnection,
     attachment: &Attachment,
-) -> StringResult {
+) -> Result<Option<String>> {
     // Find game itself
     let Some((game, part)) = msg.game(conn).await? else { return Ok(None) };
 
@@ -420,17 +428,17 @@ async fn on_participation(
 
 async fn log_message(ctx: Context, msg: Message) {
     let guild = match msg.guild_id {
-        Some(guild) => match guild.name(&ctx.cache) {
+        Some(guild) => match guild.name(&ctx) {
             Some(name) => format!("[{name}]"),
             None => "(unknown)".to_owned(),
         },
         None => "(DM)".to_owned(),
     };
-    let chan = match msg.channel_id.name(&ctx.cache).await {
-        Some(name) => format!("#{name}"),
-        None => "?#".to_owned(),
+    let chan = match msg.channel_id.name(&ctx).await {
+        Ok(name) => format!("#{name}"),
+        Err(_) => "?#".to_owned(),
     };
-    println!("({}) {guild} {chan} @{}: {}", msg.id, msg.author.tag(), msg.content_safe(&ctx.cache));
+    println!("({}) {guild} {chan} @{}: {}", msg.id, msg.author.tag(), msg.content_safe(&ctx));
 }
 
 async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
@@ -448,13 +456,14 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         react.channel_id.say(&ctx.http, "Erreur interne".to_owned()).await.unwrap();
         return Ok(());
     };
-    let Some(game) = Game::get(&mut conn, guild_id.0, react.channel_id.0).await? else {
+    let Some(game) = Game::get(&mut conn, guild_id.get(), react.channel_id.get()).await? else {
         return Ok(());
     };
 
-    let mut msg = match ctx.cache.message(react.channel_id, react.message_id) {
+    let msg = ctx.cache.message(react.channel_id, react.message_id).as_deref().cloned();
+    let mut msg = match msg {
         Some(msg) => msg,
-        None => ctx.http.get_message(react.channel_id.0, react.message_id.0).await?,
+        None => ctx.http.get_message(react.channel_id, react.message_id).await?,
     };
     // bug in serenity / discord: the fetched message has guild_id set to none. override it.
     msg.guild_id = Some(guild_id);
@@ -484,7 +493,9 @@ async fn on_reaction(ctx: &Context, react: &Reaction) -> Result<(), Error> {
         Err(Error::InvalidPage) => return Ok(()),
         Err(e) => return Err(e),
     };
-    msg.edit(&ctx, |m| m.embed(|e| e.title(title).colour(Colour::GOLD).fields(board))).await?;
+    let embed = CreateEmbed::new().title(title).colour(Colour::GOLD).fields(board);
+    let edit = EditMessage::new().embed(embed);
+    msg.edit(&ctx, edit).await?;
 
     Ok(())
 }
