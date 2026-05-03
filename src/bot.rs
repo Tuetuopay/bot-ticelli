@@ -27,10 +27,10 @@ impl EventHandler for Bot {}
 pub async fn on_error(err: FrameworkError<'_, Data, Error>) {
     let FrameworkError::Command { error, ctx, .. } = err else { return };
 
-    if let Some(s) = error.as_message() {
-        if let Err(e) = ctx.say(s).await {
-            error!("Failed to send error message: {e}");
-        }
+    if let Some(s) = error.as_message()
+        && let Err(e) = ctx.say(s).await
+    {
+        error!("Failed to send error message: {e}");
     }
 }
 
@@ -63,7 +63,7 @@ pub async fn on_event<'a>(
         }
         FullEvent::GuildMembersChunk { chunk } => {
             debug!("recieved guild member chunk with {} members", chunk.members.len());
-            let members = chunk.members.iter().map(|(_, v)| v.clone()).collect();
+            let members = chunk.members.values().cloned().collect();
             data.cache.batch_update(members).await;
         }
         FullEvent::ReactionAdd { add_reaction } => on_reaction(ctx, add_reaction, data).await?,
@@ -92,7 +92,7 @@ pub async fn on_message(ctx: &Context, msg: &Message, data: &Data) {
             let Some(attachment) = msg.attachments.iter().find(|a| a.height.is_some()) else {
                 return Ok(None);
             };
-            on_participation(&msg, conn, attachment).await
+            on_participation(msg, conn, attachment).await
         })
         .await;
 
@@ -104,10 +104,10 @@ pub async fn on_message(ctx: &Context, msg: &Message, data: &Data) {
         }
         Ok(None) => (),
         Err(ref e) => {
-            if let Some(s) = e.as_message() {
-                if let Err(e) = msg.channel_id.say(ctx, s).await {
-                    error!("{e}");
-                }
+            if let Some(s) = e.as_message()
+                && let Err(e) = msg.channel_id.say(ctx, s).await
+            {
+                error!("{e}");
             }
         }
     }
@@ -200,14 +200,17 @@ async fn on_reaction(ctx: &Context, react: &Reaction, data: &Data) -> Result<(),
     if msg.author.id != bot_id {
         return Ok(());
     }
-    let page = msg
-        .embeds
-        .get(0)
-        .and_then(|embed| embed.title.as_ref())
-        .filter(|title| title.contains("Scores"))
-        .and_then(|title| title.split(|c| c == '(' || c == '/').nth(1))
-        .and_then(|page| page.parse::<usize>().ok());
-    let Some(page) = page else { return Ok(()) };
+
+    let page = if let Some(embed) = msg.embeds.as_slice().first()
+        && let Some(ref title) = embed.title
+        && title.contains("Scores")
+        && let Some(page) = title.split(['(', '/']).nth(1)
+        && let Ok(page) = page.parse::<usize>()
+    {
+        page
+    } else {
+        return Ok(());
+    };
 
     let page = if react.emoji == ReactionType::Unicode("➡️".to_owned()) {
         page + 1

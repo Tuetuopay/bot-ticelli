@@ -179,7 +179,7 @@ pub async fn scoreboard_message(
         .map(|(i, (score, id, cache, span))| {
             async move {
                 tracing::debug!("Scoreboard entry ({i}, ({score}, {id}))");
-                let position = match i + 1 + ((page - 1) * per_page) as usize {
+                let position = match i + 1 + ((page - 1) * per_page) {
                     1 => "🥇".to_owned(),
                     2 => "🥈".to_owned(),
                     3 => "🥉".to_owned(),

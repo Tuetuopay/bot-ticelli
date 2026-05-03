@@ -46,35 +46,35 @@ async fn main() {
         .unwrap();
 
     // Install tracing framework with OTLP sink
-    if let Some(ref tracing) = config.tracing_config {
-        if let Some(ref otel) = tracing.otel {
-            // You can thank the OTEL guys for such a complicated setup.
-            let provider = SdkTracerProvider::builder()
-                .with_resource(
-                    Resource::builder()
-                        .with_service_name("bot-ticelli")
-                        .with_attribute(KeyValue::new("version", env!("CARGO_PKG_VERSION")))
-                        .build(),
-                )
-                .with_batch_exporter(
-                    opentelemetry_otlp::SpanExporter::builder()
-                        .with_http()
-                        .with_protocol(Protocol::HttpBinary)
-                        .with_endpoint(otel)
-                        .build()
-                        .expect("Failed to build exporter"),
-                )
-                .build();
-            tracing_subscriber::registry()
-                .with(tracing_subscriber::fmt::layer())
-                .with(
-                    EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| EnvFilter::new("bot_ticelli=debug,warn")),
-                )
-                .with(tracing_opentelemetry::layer().with_tracer(provider.tracer("bot-ticelli")))
-                .init();
-            tracing::info!("Installed tracing");
-        }
+    if let Some(ref tracing) = config.tracing_config
+        && let Some(ref otel) = tracing.otel
+    {
+        // You can thank the OTEL guys for such a complicated setup.
+        let provider = SdkTracerProvider::builder()
+            .with_resource(
+                Resource::builder()
+                    .with_service_name("bot-ticelli")
+                    .with_attribute(KeyValue::new("version", env!("CARGO_PKG_VERSION")))
+                    .build(),
+            )
+            .with_batch_exporter(
+                opentelemetry_otlp::SpanExporter::builder()
+                    .with_http()
+                    .with_protocol(Protocol::HttpBinary)
+                    .with_endpoint(otel)
+                    .build()
+                    .expect("Failed to build exporter"),
+            )
+            .build();
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| EnvFilter::new("bot_ticelli=debug,warn")),
+            )
+            .with(tracing_opentelemetry::layer().with_tracer(provider.tracer("bot-ticelli")))
+            .init();
+        tracing::info!("Installed tracing");
     }
 
     // Connect to database
