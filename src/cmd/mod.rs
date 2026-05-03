@@ -3,7 +3,7 @@
 use std::num::NonZeroUsize;
 
 use poise::{Command, CreateReply, builtins, command};
-use serenity::all::{ReactionType, User};
+use serenity::all::User;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -99,10 +99,7 @@ pub async fn show(
 ) -> Result<()> {
     let mut conn = ctx.conn().await?;
     if let Some(reply) = player::show(ctx, &mut conn, page).await? {
-        let reply = ctx.send(reply).await?;
-        let msg = reply.message().await?;
-        msg.react(&ctx, ReactionType::Unicode("⬅️".to_owned())).await?;
-        msg.react(&ctx, ReactionType::Unicode("➡️".to_owned())).await?;
+        ctx.send(reply).await?;
     }
     Ok(())
 }

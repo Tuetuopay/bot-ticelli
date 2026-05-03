@@ -10,13 +10,14 @@ use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use poise::CreateReply;
 use rand::seq::IndexedRandom;
 use serenity::{
-    all::{Colour, Context, CreateEmbed, CreateEmbedAuthor, User},
+    all::{Colour, Context, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, User},
     model::prelude::GuildId,
     utils::MessageBuilder,
 };
 use tracing::{Instrument, info_span, instrument};
 
 use crate::{
+    bot::{BTN_NEXT, BTN_PREV},
     cache::Cache,
     context::Ctx,
     error::{Error, Result},
@@ -141,7 +142,11 @@ pub async fn show(
     let (title, board) = scoreboard_message(ctx, conn, cache, game, guild_id, page).await?;
 
     let embed = CreateEmbed::new().title(title).colour(Colour::GOLD).fields(board);
-    Ok(Some(CreateReply::default().embed(embed)))
+    let act = CreateActionRow::Buttons(vec![
+        CreateButton::new(BTN_PREV).emoji('⬅'),
+        CreateButton::new(BTN_NEXT).emoji('➡'),
+    ]);
+    Ok(Some(CreateReply::default().embed(embed).components(vec![act])))
 }
 
 pub async fn scoreboard_message(

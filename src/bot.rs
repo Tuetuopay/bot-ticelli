@@ -4,9 +4,9 @@ use diesel::{dsl::now, prelude::ExpressionMethods};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use poise::{FrameworkContext, FrameworkError};
 use serenity::{
-    all::{Colour, CreateEmbed, EditMessage, FullEvent},
+    all::{Colour, CreateEmbed, EditMessage, FullEvent, Interaction},
     client::{Context, EventHandler},
-    model::prelude::{Attachment, Message, Reaction, ReactionType},
+    model::prelude::{Attachment, Message},
 };
 use tracing::{debug, error, instrument};
 
@@ -17,6 +17,9 @@ use crate::{
     extensions::*,
     models::*,
 };
+
+pub const BTN_PREV: &str = "prev";
+pub const BTN_NEXT: &str = "next";
 
 pub struct Bot;
 
@@ -66,7 +69,9 @@ pub async fn on_event<'a>(
             let members = chunk.members.values().cloned().collect();
             data.cache.batch_update(members).await;
         }
-        FullEvent::ReactionAdd { add_reaction } => on_reaction(ctx, add_reaction, data).await?,
+        FullEvent::InteractionCreate { interaction } => {
+            on_interaction(ctx, interaction, data).await?
+        }
         FullEvent::Message { new_message } => on_message(ctx, new_message, data).await,
         _ => (),
     }
@@ -170,38 +175,34 @@ async fn log_message(ctx: Context, msg: Message) {
     println!("({}) {guild} {chan} @{}: {}", msg.id, msg.author.tag(), msg.content_safe(&ctx));
 }
 
-async fn on_reaction(ctx: &Context, react: &Reaction, data: &Data) -> Result<(), Error> {
+async fn on_interaction(ctx: &Context, inter: &Interaction, data: &Data) -> Result<(), Error> {
     let Some(bot_id) = data.bot_user_id.lock().unwrap().as_ref().copied() else {
-        tracing::warn!("Got react on message but bot is not cached");
+        tracing::warn!("Got interaction on message but bot is not cached");
         return Ok(());
     };
-    if react.user_id == Some(bot_id) {
-        return Ok(());
-    }
-    let guild_id = react.guild_id.unwrap();
 
+    let Interaction::Component(inter) = inter else { return Ok(()) };
+    if inter.data.custom_id != BTN_PREV && inter.data.custom_id != BTN_NEXT {
+        return Ok(());
+    };
+    // Discord lingo to ack the interaction and tell we'll edit the message.
+    inter.defer(ctx).await?;
+
+    let guild_id = inter.guild_id.unwrap();
     let Ok(mut conn) = data.pool.get().await else {
         // TODO raise to sentry
-        react.channel_id.say(ctx, "Erreur interne".to_owned()).await.unwrap();
+        inter.channel_id.say(ctx, "Erreur interne".to_owned()).await.unwrap();
         return Ok(());
     };
-    let Some(game) = Game::get(&mut conn, guild_id.get(), react.channel_id.get()).await? else {
+    let Some(game) = Game::get(&mut conn, guild_id.get(), inter.channel_id.get()).await? else {
         return Ok(());
     };
 
-    let msg = ctx.cache.message(react.channel_id, react.message_id).as_deref().cloned();
-    let mut msg = match msg {
-        Some(msg) => msg,
-        None => ctx.http.get_message(react.channel_id, react.message_id).await?,
-    };
-    // bug in serenity / discord: the fetched message has guild_id set to none. override it.
-    msg.guild_id = Some(guild_id);
-
-    if msg.author.id != bot_id {
+    if inter.message.author.id != bot_id {
         return Ok(());
     }
 
-    let page = if let Some(embed) = msg.embeds.as_slice().first()
+    let page = if let Some(embed) = inter.message.embeds.as_slice().first()
         && let Some(ref title) = embed.title
         && title.contains("Scores")
         && let Some(page) = title.split(['(', '/']).nth(1)
@@ -212,9 +213,9 @@ async fn on_reaction(ctx: &Context, react: &Reaction, data: &Data) -> Result<(),
         return Ok(());
     };
 
-    let page = if react.emoji == ReactionType::Unicode("➡️".to_owned()) {
+    let page = if inter.data.custom_id == BTN_NEXT {
         page + 1
-    } else if react.emoji == ReactionType::Unicode("⬅️".to_owned()) && page > 1 {
+    } else if inter.data.custom_id == BTN_PREV && page > 1 {
         page - 1
     } else {
         return Ok(());
@@ -228,7 +229,7 @@ async fn on_reaction(ctx: &Context, react: &Reaction, data: &Data) -> Result<(),
         };
     let embed = CreateEmbed::new().title(title).colour(Colour::GOLD).fields(board);
     let edit = EditMessage::new().embed(embed);
-    msg.edit(ctx, edit).await?;
+    inter.message.clone().edit(ctx, edit).await?;
 
     Ok(())
 }
